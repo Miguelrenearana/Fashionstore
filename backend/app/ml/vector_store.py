@@ -51,10 +51,10 @@ class VectorStore:
             exclusions = "AND variant_id != ALL(:exclude_ids)"
             params["exclude_ids"] = exclude_ids
         query = text(
-            "SELECT variant_id, 1 - (embedding <=> :vec) AS score "
+            "SELECT variant_id, 1 - (embedding <=> CAST(:vec AS vector)) AS score "
             "FROM product_embeddings "
             f"WHERE embedding IS NOT NULL {exclusions} "
-            "ORDER BY embedding <=> :vec "
+            "ORDER BY embedding <=> CAST(:vec AS vector) "
             "LIMIT :limit"
         )
         with engine.connect() as conn:

@@ -9,3 +9,4 @@ class RecommendationRead(ORMModel):
     score: float
     variant_name: str | None = None
     variant_sku: str | None = None
+    garment_id: int | None = None

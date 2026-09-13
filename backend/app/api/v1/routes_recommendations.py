@@ -30,6 +30,7 @@ def recommend(db: DbSession, current: CurrentUser, source_variant_id: int | None
             score=float(rec.score),
             variant_name=variant.garment.name if variant else None,
             variant_sku=variant.sku if variant else None,
+            garment_id=variant.garment_id if variant else None,
         )
         result.append(item)
     return result

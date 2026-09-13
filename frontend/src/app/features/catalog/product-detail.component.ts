@@ -26,6 +26,14 @@ interface ProductDetail {
   variants: Variant[];
 }
 
+interface Recommendation {
+  suggested_variant_id: number;
+  score: number;
+  variant_name: string | null;
+  variant_sku: string | null;
+  garment_id: number | null;
+}
+
 @Component({
   selector: 'app-product-detail',
   standalone: true,
@@ -66,6 +74,18 @@ interface ProductDetail {
             <p class="msg">{{ message() }}</p>
           </div>
         </div>
+
+        @if (recommendations().length > 0) {
+          <div class="recommendations">
+            <h3>También te puede interesar</h3>
+            @for (r of recommendations(); track r.suggested_variant_id) {
+              <a class="rec card" [routerLink]="['/catalog', r.garment_id]">
+                <span>{{ r.variant_name }}</span>
+                <small>{{ r.variant_sku }} · afinidad {{ (r.score * 100).toFixed(0) }}%</small>
+              </a>
+            }
+          </div>
+        }
       } @else {
         <p>Cargando producto...</p>
       }
@@ -142,6 +162,26 @@ interface ProductDetail {
       .msg {
         margin-top: 0.75rem;
       }
+      .recommendations {
+        margin-top: 2rem;
+      }
+      .recommendations h3 {
+        margin-bottom: 0.5rem;
+      }
+      .rec {
+        display: block;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+      }
+      .rec small {
+        display: block;
+        color: #777;
+        margin-top: 0.2rem;
+      }
     `,
   ],
 })
@@ -155,6 +195,7 @@ export class ProductDetailComponent implements OnInit {
   readonly selected = signal<Variant | null>(null);
   readonly adding = signal(false);
   readonly message = signal('');
+  readonly recommendations = signal<Recommendation[]>([]);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -163,7 +204,17 @@ export class ProductDetailComponent implements OnInit {
       .subscribe((item) => {
         this.item.set(item);
         this.selected.set(item.variants[0] ?? null);
+        this.loadRecommendations(item.variants[0]?.id);
       });
+  }
+
+  private loadRecommendations(variantId?: number): void {
+    if (!variantId || !this.auth.isAuthenticated()) return;
+    this.http
+      .get<Recommendation[]>(
+        `${environment.apiUrl}/recommendations?source_variant_id=${variantId}&limit=4`
+      )
+      .subscribe((recs) => this.recommendations.set(recs));
   }
 
   primaryImage(item: ProductDetail): string | null {

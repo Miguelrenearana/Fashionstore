@@ -442,6 +442,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
+    op.create_unique_constraint("uq_product_embeddings_variant_id", "product_embeddings", ["variant_id"])
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_product_embeddings_vector "
         "ON product_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"

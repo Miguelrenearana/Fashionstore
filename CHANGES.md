@@ -4,6 +4,23 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
+## 2026-09-13 — CU-17 Recomendaciones IA (pgvector)
+
+- **Backend ML:** backfill `recompute_embeddings` codifica nombre+categoría+descripción por variante
+  con `all-MiniLM-L6-v2` (384d) e inserta en `product_embeddings` (constraint única
+  `uq_product_embeddings_variant_id` añadida a la migración). `GET /recommendations`
+  recomienda por similitud coseno (`embedding <=> CAST(:vec AS vector)`, índice ivfflat)
+  excluyendo la variante origen o usando el historial de navegación; `POST
+  /recommendations/view/{variant_id}` registra vistas; el score se persiste en `recomendacion`.
+- **BD Neon:** embeddings generados + índice consolida; verificado con peticiones reales (variante
+  2 recomendada al ver la 1, afinidad 100%).
+- **Tests:** 3 nuevas (`tests/test_recommendations.py`): requiere auth, por variante (score>0,
+  excluye origen) y por historial. Total: 36.
+- **Frontend:** sección "También te puede interesar" en el detalle de producto (afinidad %, enlace
+  al catálogo) para clientes autenticados.
+- **UML + tabla CU:** `docs/uml/ciclo1/CU-17/{sequence,communication}.puml`.
+- Referencias: overleaf CU-17.
+
 ## 2026-09-13 — CU-13 Reservas / CU-14 Ventas / CU-15 Pagos
 
 - **Backend CU-13:** `POST /cart/checkout` ahora convierte el carrito en reserva (pickup_code,
@@ -101,5 +118,4 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ## Pendiente de registrar
 
-- Ciclo 1: CU-17 (recomendaciones IA) (+ UML + tabla de CU).
 - Despliegue a nubes (Render/Vercel/Firebase) cuando el dueño lo solicite.

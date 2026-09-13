@@ -4,6 +4,18 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
+## 2026-09-13 — CU-12 Inventario y stock
+
+- **Backend:** `GET /inventory` lista stock por sucursal con detalle de variante (prenda, SKU,
+  talla, color, reservado); `GET /inventory/movements` (historial IN/OUT); `PATCH
+  /inventory/{branch}/{variant}/adjust` con validación de stock no-negativo y no menor al
+  reservado. Rutas protegidas (ADMIN/MANAGER). **Tests:** 5 nuevas (listado, 403, ajuste,
+  stock negativo, movimientos). Total: 28.
+- **Frontend:** panel de inventario en `/branch` (selector de sucursal, tabla de stock y
+  ajuste ±1 con motivo).
+- **UML + tabla CU:** `docs/uml/ciclo1/CU-12/{sequence,communication}.puml`.
+- Referencias: overleaf CU-12.
+
 ## 2026-09-13 — CU-04 Sucursales y ciudades
 
 - **Backend:** `POST /locations/branches` restringido a ADMIN/MANAGER; `list_branches` precarga
@@ -66,5 +78,5 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ## Pendiente de registrar
 
-- Ciclo 1: CU-12, 13, 14, 15, 17 (+ UML + tabla de CU).
+- Ciclo 1: CU-13, 14, 15, 17 (+ UML + tabla de CU).
 - Despliegue a nubes (Render/Vercel/Firebase) cuando el dueño lo solicite.

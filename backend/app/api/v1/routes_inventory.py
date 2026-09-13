@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies import DbSession, require_roles
-from app.schemas.inventory import InventoryAdjust, InventoryRead
+from app.schemas.inventory import InventoryAdjust, InventoryMovementRead, InventoryRead
 from app.services.inventory_service import inventory_service
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -9,12 +9,32 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 admin_manager = require_roles("ADMIN", "MANAGER")
 
 
-@router.get("", response_model=list[InventoryRead])
-def list_inventory(db: DbSession, branch_id: int, variant_id: int):
-    item = inventory_service.get(db, branch_id, variant_id)
-    return [item]
+@router.get("", response_model=list[InventoryRead], dependencies=[Depends(admin_manager)])
+def list_inventory(
+    db: DbSession,
+    branch_id: int,
+    variant_id: int | None = Query(None),
+):
+    return inventory_service.list(db, branch_id, variant_id)
 
 
-@router.patch("/adjust", response_model=InventoryRead, dependencies=[Depends(admin_manager)])
+@router.get(
+    "/movements",
+    response_model=list[InventoryMovementRead],
+    dependencies=[Depends(admin_manager)],
+)
+def list_movements(
+    db: DbSession,
+    branch_id: int | None = None,
+    variant_id: int | None = None,
+):
+    return inventory_service.list_movements(db, branch_id, variant_id)
+
+
+@router.patch(
+    "/{branch_id}/{variant_id}/adjust",
+    response_model=InventoryRead,
+    dependencies=[Depends(admin_manager)],
+)
 def adjust_inventory(db: DbSession, branch_id: int, variant_id: int, payload: InventoryAdjust):
-    return inventory_service.adjust(db, branch_id, variant_id, payload.quantity, payload.reason)
+    return inventory_service.adjust(db, branch_id, variant_id, payload)

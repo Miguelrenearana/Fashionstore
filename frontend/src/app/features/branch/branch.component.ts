@@ -18,6 +18,23 @@ interface Branch {
   city: { id: number; name: string; state: string } | null;
 }
 
+interface InventoryRow {
+  id: number;
+  branch_id: number;
+  variant_id: number;
+  quantity: number;
+  reserved_quantity: number;
+  available: number;
+  variant: {
+    id: number;
+    sku: string;
+    price: number;
+    size_name?: string;
+    color_name?: string;
+    garment?: { id: number; name: string } | null;
+  } | null;
+}
+
 @Component({
   selector: 'app-branch',
   standalone: true,
@@ -54,6 +71,51 @@ interface Branch {
         <button type="submit" [disabled]="saving()">Crear sucursal</button>
         <p class="msg">{{ message() }}</p>
       </form>
+
+      <section class="inventory">
+        <h3>Inventario por sucursal</h3>
+        <select (change)="loadInventory($event)">
+          <option value="">Selecciona sucursal...</option>
+          @for (b of branches(); track b.id) {
+            <option [value]="b.id">{{ b.name }}</option>
+          }
+        </select>
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>SKU</th>
+              <th>Talla</th>
+              <th>Color</th>
+              <th>Stock</th>
+              <th>Reservado</th>
+              <th>Disponible</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td>{{ row.variant?.garment?.name }}</td>
+                <td>{{ row.variant?.sku }}</td>
+                <td>{{ row.variant?.size_name }}</td>
+                <td>{{ row.variant?.color_name }}</td>
+                <td>{{ row.quantity }}</td>
+                <td>{{ row.reserved_quantity }}</td>
+                <td>{{ row.available }}</td>
+                <td>
+                  <button (click)="adjust(row, 1)">+1</button>
+                  <button (click)="adjust(row, -1)" [disabled]="row.available <= 0">-1</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8">Selecciona una sucursal.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
     </section>
   `,
   styles: [
@@ -106,6 +168,24 @@ interface Branch {
         margin: 0.5rem 0 0;
         font-size: 0.85rem;
       }
+      .inventory {
+        margin-top: 2rem;
+      }
+      .inventory select {
+        margin-bottom: 1rem;
+        padding: 0.4rem;
+      }
+      .inventory table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      .inventory th,
+      .inventory td {
+        border: 1px solid #ddd;
+        padding: 0.35rem 0.5rem;
+        text-align: left;
+      }
     `,
   ],
 })
@@ -113,6 +193,7 @@ export class BranchComponent implements OnInit {
   private auth = inject(AuthService);
   readonly branches = signal<Branch[]>([]);
   readonly cities = signal<City[]>([]);
+  readonly rows = signal<InventoryRow[]>([]);
   readonly saving = signal(false);
   readonly message = signal('');
 
@@ -151,6 +232,49 @@ export class BranchComponent implements OnInit {
         this.message.set('Sucursal creada.');
       })
       .catch((e) => this.message.set(`Error: ${e.message}`))
+      .finally(() => this.saving.set(false));
+  }
+
+  loadInventory(event: Event): void {
+    const branchId = (event.target as HTMLSelectElement).value;
+    if (!branchId) {
+      this.rows.set([]);
+      return;
+    }
+    this.fetchInventory(Number(branchId));
+  }
+
+  private fetchInventory(branchId: number): void {
+    fetch(`${environment.apiUrl}/inventory?branch_id=${branchId}`, {
+      headers: { Authorization: `Bearer ${this.auth.token()}` },
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
+      .then((data: InventoryRow[]) => this.rows.set(data))
+      .catch((e) => this.message.set(`Inventario: ${e}`));
+  }
+
+  adjust(row: InventoryRow, delta: number): void {
+    this.saving.set(true);
+    fetch(
+      `${environment.apiUrl}/inventory/${row.branch_id}/${row.variant_id}/adjust`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.auth.token()}`,
+        },
+        body: JSON.stringify({ quantity: delta, reason: 'ajuste manual' }),
+      }
+    )
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = (await r.json()) as { detail?: string };
+          throw new Error(body.detail ?? r.statusText);
+        }
+        return r.json();
+      })
+      .then(() => this.fetchInventory(row.branch_id))
+      .catch((e) => this.message.set(`Ajuste: ${e.message}`))
       .finally(() => this.saving.set(false));
   }
 }

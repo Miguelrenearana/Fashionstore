@@ -1,0 +1,42 @@
+@startuml CU-04
+actor "Administrador" as Adm
+boundary "«UI» Angular (admin)" as UI
+control "«Controller» API /users" as Ctrl
+entity "«Model» UserService / user, role, employee" as Model
+
+Adm -> UI : Abrir panel de administración
+UI -> Ctrl : GET /users?page=&size= (Bearer)
+Ctrl -> Model : list_users(db, page, size)
+Model --> Ctrl : usuarios + roles
+Ctrl --> UI : 200 UserRead[]
+
+Adm -> UI : Crear usuario con roles
+UI -> Ctrl : POST /users (email, password, roles)
+Ctrl -> Model : create(db, payload)
+Model --> Ctrl : UserRead (roles asignados)
+Ctrl --> UI : 201 UserRead
+
+Adm -> UI : Actualizar usuario (teléfono / activo / roles)
+UI -> Ctrl : PATCH /users/{id}
+Ctrl -> Model : update(db, user_id, payload)
+Model --> Ctrl : UserRead actualizado
+Ctrl --> UI : 200 UserRead
+
+Adm -> UI : Habilitar / deshabilitar cuenta
+UI -> Ctrl : PATCH /users/{id} (activo=false)
+Ctrl -> Model : update(db, user_id, payload)
+Ctrl --> UI : UserRead (inactivo)
+
+Adm -> UI : Consultar roles disponibles
+UI -> Ctrl : GET /users/roles
+Ctrl -> Model : list_roles(db)
+Model --> Ctrl : roles
+Ctrl --> UI : RoleRead[]
+
+Adm -> UI : Vincular empleado a sucursal
+UI -> Ctrl : POST /users/{id}/employee (branch_id)
+Ctrl -> Model : link_employee(db, user_id, payload)
+Model --> Ctrl : EmployeeRead (branch)
+Ctrl --> UI : 201 EmployeeRead
+
+@enduml

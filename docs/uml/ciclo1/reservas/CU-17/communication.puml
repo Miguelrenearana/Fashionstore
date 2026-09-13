@@ -1,0 +1,36 @@
+@startuml CU-17
+actor "Encargado de sucursal" as Stf
+actor "Cliente (con reserva)" as Cli
+boundary "«UI» Angular (gestión de reservas)" as UI
+control "«Controller» API /reservations, /sales" as Ctrl
+entity "«Model» ReservationService / SalesService / Inventory" as Model
+
+Cli -> Stf : 1: presenta su código de recogida
+Stf -> UI : 2: verificar reserva
+UI -> Ctrl : 3: GET /reservations/{id}
+Ctrl -> Model : 4: get(db, reservation_id)
+Model --> Ctrl : 5: ReservationRead (pickup_code, estado)
+Ctrl --> UI : 6: verificación de reserva
+UI --> Stf : 7: reserva verificada
+
+Stf -> UI : 8: registrar recepción / preparar atención
+UI -> Ctrl : 9: PATCH /reservations/{id}/status
+Ctrl -> Model : 10: transition(PENDING → PREPARED)
+Model --> Ctrl : 11: reserva PREPARED
+Ctrl --> UI : 12: ReservationRead
+UI --> Stf : 13: atención iniciada (prendas preparadas)
+
+Stf -> UI : 14: cliente en atención (prueba)
+UI -> Ctrl : 15: PATCH /reservations/{id}/status
+Ctrl -> Model : 16: transition(PREPARED → IN_TRIAL)
+Model --> Ctrl : 17: reserva IN_TRIAL
+Ctrl --> UI : 18: ReservationRead
+
+Stf -> UI : 19: concluir la atención
+UI -> Ctrl : 20: POST /sales {reservation_id}
+Ctrl -> Model : 21: create_sale(db, reservation)
+Model --> Ctrl : 22: reserva COMPLETED + Sale
+Ctrl --> UI : 23: SaleRead
+UI --> Stf : 24: reserva atendida
+
+@enduml

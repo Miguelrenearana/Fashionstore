@@ -1,0 +1,18 @@
+@startuml CU-12
+actor "Cliente" as Cli
+boundary "«UI» Angular (catálogo)" as UI
+control "«Controller» API /catalog" as Ctrl
+entity "«Model» CatalogService / garment, category, image, variant" as Model
+
+Cli -> UI : Consultar las prendas disponibles
+UI -> Ctrl : GET /catalog?page=&size=
+Ctrl -> Model : list_catalog(db, page, size)
+Model --> Ctrl : prendas activas + categoría + imágenes + variantes (talla/color) + in_stock
+Ctrl --> UI : Page[CatalogItemRead]
+UI --> Cli : Grid de resultados (imagen, precio, disponibilidad)
+
+Cli -> UI : Navegar entre páginas del catálogo
+UI -> Ctrl : GET /catalog?page=N&size=M
+Ctrl --> UI : Page[CatalogItemRead]
+
+@enduml

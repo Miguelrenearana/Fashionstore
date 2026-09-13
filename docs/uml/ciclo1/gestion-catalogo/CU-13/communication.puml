@@ -1,0 +1,27 @@
+@startuml CU-13
+actor "Cliente" as Cli
+boundary "«UI» Angular (catálogo con filtros)" as UI
+control "«Controller» API /catalog" as Ctrl
+entity "«Model» CatalogService / garment, category" as Model
+
+Cli -> UI : 1: criterios de búsqueda
+UI -> Ctrl : 2: GET /catalog (search, category_id, branch_id)
+Ctrl -> Model : 3: list_catalog(db, filtros)
+Model --> Ctrl : 4: prendas que cumplen los criterios
+Ctrl --> UI : 5: Page[CatalogItemRead]
+UI --> Cli : 6: resultados filtrados
+
+Cli -> UI : 7: cargar categorías
+UI -> Ctrl : 8: GET /catalog/categories
+Ctrl -> Model : 9: list_categories(db)
+Model --> Ctrl : 10: categorías activas
+Ctrl --> UI : 11: CategoryRead[]
+UI --> Cli : 12: opciones del filtro
+
+Cli -> UI : 13: aplicar/ajustar filtros
+UI -> Ctrl : 14: GET /catalog (nuevos parámetros)
+Model --> Ctrl : 15: resultado actualizado
+Ctrl --> UI : 16: Page[CatalogItemRead]
+UI --> Cli : 17: catálogo filtrado
+
+@enduml

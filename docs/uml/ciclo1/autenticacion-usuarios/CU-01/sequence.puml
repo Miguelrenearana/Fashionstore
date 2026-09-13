@@ -1,0 +1,20 @@
+@startuml CU-01
+actor "Usuario (Admin / Empleado / Cliente)" as Usr
+boundary "«UI» Angular (login)" as UI
+control "«Controller» API /auth" as Ctrl
+entity "«Model» AuthService / user" as Model
+
+Usr -> UI : Acceder a FASHIONSTORE
+UI -> Ctrl : POST /auth/login (email, password)
+Ctrl -> Model : authenticate(db, email, password)
+Model --> Ctrl : usuario válido + roles
+Ctrl -> Model : issue_token(user)
+Model --> Ctrl : token JWT (claims + roles)
+Ctrl --> UI : TokenResponse (access_token)
+UI -> Ctrl : GET /users/me (Bearer)
+Ctrl -> Model : get(current_user)
+Model --> Ctrl : perfil + roles
+Ctrl --> UI : UserRead
+UI --> Usr : Sesión iniciada (panel según rol)
+
+@enduml

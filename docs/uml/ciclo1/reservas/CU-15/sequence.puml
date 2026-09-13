@@ -1,0 +1,33 @@
+@startuml CU-15
+actor "Cliente" as Cli
+boundary "«UI» Angular (carrito / mis reservas)" as UI
+control "«Controller» API /cart, /reservations" as Ctrl
+entity "«Model» CartService / ReservationService / Inventory" as Model
+
+Cli -> UI : Agregar varias prendas al carrito
+UI -> Ctrl : POST /cart/items {variant_id, quantity} (varias)
+Ctrl -> Model : add_item(db, cart, variant, qty)
+Model --> Ctrl : carrito con detalle y total
+Ctrl --> UI : CartRead
+UI --> Cli : Carrito actualizado
+
+Cli -> UI : Confirmar reserva (check-out) con sucursal
+UI -> Ctrl : POST /cart/checkout {branch_id}
+Ctrl -> Model : create(db, client, items) → valida stock y reserved_quantity += q
+Model --> Ctrl : reserva PENDING + pickup_code + expires_at
+Ctrl -> Model : clear(cart)
+Ctrl --> UI : ReservationRead
+UI --> Cli : Código de recogida y vencimiento mostrados
+
+Cli -> UI : Consultar mis reservas
+UI -> Ctrl : GET /reservations/me
+Model --> Ctrl : Lista de reservas del cliente
+Ctrl --> UI : ReservationRead[]
+
+Cli -> UI : Cancelar una reserva propia
+UI -> Ctrl : PATCH /reservations/{id}/status (CANCELLED)
+Ctrl -> Model : transition(CANCELLED) → libera stock reservado
+Model --> Ctrl : reserva CANCELLED
+Ctrl --> UI : ReservationRead
+
+@enduml

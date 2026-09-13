@@ -35,18 +35,22 @@ Formato:
 
 ### Ciclo 1 (completado — tag `v1.0.0-ciclo1`)
 - [x] Base del backend (FastAPI + core + esquemas).
-- [x] CU-01 Gestión de usuarios / autenticación
-- [x] CU-02 Gestión de roles y empleados
-- [x] CU-04 Gestión de sucursales (multitienda)
-- [x] CU-06 Consulta de catálogo de prendas
-- [x] CU-07 Detalle de producto / variantes
-- [x] CU-12 Gestión de inventario
-- [x] CU-13 Reserva de prendas (probador)
-- [x] CU-14 Flujo de reserva → venta
-- [x] CU-15 Pago de reserva (Mock/PagosNet)
-- [x] CU-17 Consulta de recomendaciones IA
-- [x] UML (secuencia + comunicación) por cada CU implementado.
+- [x] CU-01 Iniciar sesión (+ UML/paquetes)
+- [x] CU-02 Cerrar sesión (+ UML)
+- [x] CU-04 Gestionar usuarios y roles (+ UML)
+- [x] CU-06 Gestionar ciudades y sucursales (+ UML)
+- [x] CU-07 Gestionar productos de ropa (+ UML; actualizar/eliminar prendas en Ciclo 2)
+- [x] CU-12 Consultar catálogo (+ UML)
+- [x] CU-13 Buscar y filtrar prendas (+ UML)
+- [x] CU-14 Consultar disponibilidad por sucursal (+ UML)
+- [x] CU-15 Gestionar reserva de múltiples prendas (+ UML)
+- [x] CU-17 Gestión de recepción y atención de reservas (+ UML; listado de reservas por staff pendiente)
+- [x] UML (secuencia + comunicación) por cada CU implementado, agrupado por paquete.
 - [x] Tabla de caso de uso por CU (formato RULES §7).
+
+> Nota: diagramas y tablas usan la **numeración oficial** del proyecto
+> (`docs/uml/ciclo1/{autenticacion-usuarios,gestion-catalogo,reservas}/CU-XX/`).
+> Pagos e inventario/ajustes y recomendaciones IA se evalúan en Ciclo 2.
 
 ### Ciclo 2
 - [ ] CU-03 Gestión de clientes

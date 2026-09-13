@@ -1,0 +1,20 @@
+@startuml CU-01
+actor "Usuario (Admin / Empleado / Cliente)" as Usr
+boundary "«UI» Angular (login)" as UI
+control "«Controller» API /auth" as Ctrl
+entity "«Model» AuthService / user" as Model
+
+Usr -> UI : 1: solicitud de acceso
+UI -> Ctrl : 2: POST /auth/login (email, contraseña)
+Ctrl -> Model : 3: authenticate(db, email, password)
+Model --> Ctrl : 4: usuario + roles
+Ctrl -> Model : 5: issue_token(user)
+Model --> Ctrl : 6: JWT
+Ctrl --> UI : 7: TokenResponse (access_token)
+UI -> Ctrl : 8: GET /users/me (Bearer)
+Ctrl -> Model : 9: perfil del usuario actual
+Model --> Ctrl : 10: UserRead
+Ctrl --> UI : 11: UserRead
+UI --> Usr : 12: sesión activa según rol
+
+@enduml

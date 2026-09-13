@@ -4,6 +4,22 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
+## 2026-09-13 — Renumeración UML a casos de uso oficiales (Ciclo 1)
+
+- **Docs:** `docs/uml/ciclo1/` reorganizado por **paquete** con la **numeración oficial** del
+  proyecto (cada CU del examen es un caso de uso aparte):
+  - `autenticacion-usuarios/`: CU-01 Iniciar sesión · CU-02 Cerrar sesión · CU-04 Gestionar usuarios y roles.
+  - `gestion-catalogo/`: CU-06 Ciudades y sucursales · CU-07 Productos de ropa · CU-12 Consultar
+    catálogo · CU-13 Buscar y filtrar prendas · CU-14 Disponibilidad por sucursal.
+  - `reservas/`: CU-15 Reserva de múltiples prendas · CU-17 Recepción y atención de reservas.
+- Se eliminan las carpetas planas anteriores con la numeración interna (CU-01…CU-17).
+- **Cuadre con la implementación:** los diagramas reflejan los endpoints reales del backend;
+  el listado general de reservas por staff y cobro/pago quedan como pendientes (pagos → Ciclo 2;
+  la consulta de reservas recibidas se documenta como pendiente en la tabla CU-17).
+- Referencias: listado oficial de casos de uso entregado por el dueño del proyecto.
+
+---
+
 ## 2026-09-13 — CU-17 Recomendaciones IA (pgvector)
 
 - **Backend ML:** backfill `recompute_embeddings` codifica nombre+categoría+descripción por variante

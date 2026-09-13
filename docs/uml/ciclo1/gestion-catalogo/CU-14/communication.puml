@@ -1,0 +1,26 @@
+@startuml CU-14
+actor "Cliente" as Cli
+boundary "«UI» Angular (catálogo / selector de sucursal)" as UI
+control "«Controller» API /catalog" as Ctrl
+entity "«Model» CatalogService / Inventory" as Model
+
+Cli -> UI : 1: seleccionar sucursal
+UI -> Ctrl : 2: GET /locations/branches
+Ctrl --> UI : 3: BranchRead[]
+UI --> Cli : 4: sucursales disponibles
+
+Cli -> UI : 5: pedir disponibilidad por sucursal
+UI -> Ctrl : 6: GET /catalog?branch_id=X
+Ctrl -> Model : 7: list_catalog(db, branch_id)
+Model --> Ctrl : 8: prendas con in_stock según inventario
+Ctrl --> UI : 9: Page[CatalogItemRead]
+UI --> Cli : 10: disponibilidad según sucursal
+
+Cli -> UI : 11: elegir talla y color
+UI -> Ctrl : 12: GET /catalog/{id}
+Ctrl -> Model : 13: get(db, garment_id)
+Model --> Ctrl : 14: variantes talla/color
+Ctrl --> UI : 15: CatalogItemRead
+UI --> Cli : 16: stock de la combinación
+
+@enduml

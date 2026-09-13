@@ -1,0 +1,15 @@
+@startuml CU-02
+actor "Usuario autenticado" as Usr
+boundary "«UI» Angular (barra de navegación)" as UI
+control "«Controller» API /auth" as Ctrl
+entity "«Model» AuthService / sesión (JWT)" as Model
+
+Usr -> UI : 1: clic en "Cerrar sesión"
+UI -> Ctrl : 2: POST /auth/logout
+Ctrl -> Model : 3: logout() (JWT sin estado)
+Model --> Ctrl : 4: ok
+Ctrl --> UI : 5: Message (200)
+UI -> UI : 6: elimina el token local
+UI --> Usr : 7: redirección a /login
+
+@enduml

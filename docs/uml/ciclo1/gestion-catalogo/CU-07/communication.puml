@@ -1,0 +1,28 @@
+@startuml CU-07
+actor "Admin / Manager" as Adm
+boundary "«UI» Angular (admin productos)" as UI
+control "«Controller» API /products" as Ctrl
+entity "«Model» ProductService / garment, variant, category, image" as Model
+
+Adm -> UI : 1: registrar prenda
+UI -> Ctrl : 2: POST /products
+Ctrl -> Model : 3: create(db, payload)
+Model --> Ctrl : 4: GarmentRead (con variantes)
+Ctrl --> UI : 5: 201
+UI --> Adm : 6: prenda en el catálogo
+
+Adm -> UI : 7: consultar prenda
+UI -> Ctrl : 8: GET /products/{garment_id}
+Ctrl -> Model : 9: get(db, garment_id)
+Model --> Ctrl : 10: GarmentRead
+Ctrl --> UI : 11: 200
+UI --> Adm : 12: detalle de la prenda
+
+Adm -> UI : 13: consultar variantes
+UI -> Ctrl : 14: GET /products/{garment_id}/variants
+Ctrl -> Model : 15: get(db, garment_id)
+Model --> Ctrl : 16: variantes talla/color
+Ctrl --> UI : 17: VariantRead[]
+UI --> Adm : 18: variantes con SKU y precio
+
+@enduml

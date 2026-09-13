@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError
-from app.models.catalog import Category, Color, Garment, GarmentVariant, Size
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.models.catalog import Category, Collection, Color, Garment, GarmentVariant, Size
 from app.schemas.product import GarmentCreate
 
 
@@ -9,7 +9,7 @@ class ProductService:
     def create(self, db: Session, payload: GarmentCreate) -> Garment:
         if not db.get(Category, payload.category_id):
             raise NotFoundError("Category not found.")
-        if payload.collection_id and not db.get(Category, payload.collection_id):
+        if payload.collection_id and not db.get(Collection, payload.collection_id):
             raise NotFoundError("Collection not found.")
         garment = Garment(
             category_id=payload.category_id,
@@ -46,10 +46,12 @@ class ProductService:
         if not color and v.color_name:
             color = Color(name=v.color_name)
             db.add(color)
+        if not size or not color:
+            raise ValidationError("Each variant requires a size and a color.")
         return GarmentVariant(
             garment=garment,
-            size_id=size.id if size else None,
-            color_id=color.id if color else None,
+            size=size,
+            color=color,
             sku=v.sku,
             price=v.price,
         )

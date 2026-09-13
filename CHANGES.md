@@ -4,6 +4,20 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
+## 2026-09-13 — CU-06 Catálogo / CU-07 Detalle de producto
+
+- **Backend:** `GET /catalog/categories`; filtros por búsqueda, categoría y sucursal en
+  `GET /catalog`; detalle con variantes (talla/color) e inventario. `min_price` e `in_stock`
+  en la lectura de catálogo. `get` de catálogo con 404 propio.
+- Fix `product_service`: validación de `Collection` (antes `Category`) y variantes requieren
+  talla y color (evita NULL en columnas NOT NULL).
+- **Tests:** 7 nuevas pruebas de catálogo (listado, detalle, 404, categorías, búsqueda,
+  filtros por categoría y sucursal). Suites: 18 pruebas en total.
+- **Frontend:** catálogo con imágenes, categoría, precio mínimo, estado de stock, buscador y
+  filtro por categoría; vista `/catalog/:id` con selector de talla/color y "Agregar al carrito".
+- **UML + tabla CU:** `docs/uml/ciclo1/CU-06/{sequence,communication}.puml`, `CU-07/…`.
+- Referencias: overleaf CU-06, CU-07.
+
 ## 2026-09-13 — CU-01 Gestión de usuarios / CU-02 Roles y empleados
 
 - **Backend:** `POST /users/{id}/employee` para vincular empleados a sucursal; `GET /users/roles`;
@@ -42,5 +56,5 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ## Pendiente de registrar
 
-- Ciclo 1: CU-04, 06, 07, 12, 13, 14, 15, 17 (+ UML + tabla de CU).
+- Ciclo 1: CU-04, 12, 13, 14, 15, 17 (+ UML + tabla de CU).
 - Despliegue a nubes (Render/Vercel/Firebase) cuando el dueño lo solicite.

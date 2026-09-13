@@ -77,6 +77,21 @@ class Garment(Base, TimestampMixin, SoftDeleteMixin):
     )
     promotions = relationship("Promotion", secondary="promocion_prenda", back_populates="garments")
 
+    @property
+    def variants(self):
+        return self.variations
+
+    @property
+    def min_price(self) -> Decimal:
+        prices = [v.price for v in self.variations]
+        return min(prices) if prices else self.base_price
+
+    @property
+    def in_stock(self) -> bool:
+        return any(
+            v.inventory is not None and v.inventory.available > 0 for v in self.variations
+        )
+
 
 class GarmentVariant(Base, TimestampMixin):
     __tablename__ = "prenda_variante"
@@ -92,6 +107,14 @@ class GarmentVariant(Base, TimestampMixin):
     size = relationship("Size", back_populates="variations")
     color = relationship("Color", back_populates="variations")
     inventory = relationship("Inventory", back_populates="variant", uselist=False)
+
+    @property
+    def size_name(self) -> str | None:
+        return self.size.name if self.size else None
+
+    @property
+    def color_name(self) -> str | None:
+        return self.color.name if self.color else None
 
 
 class GarmentImage(Base, TimestampMixin):

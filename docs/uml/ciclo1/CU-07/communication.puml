@@ -1,0 +1,21 @@
+@startuml CU-07
+actor "Cliente" as Cli
+boundary "«UI» Angular (detalle)" as UI
+control "«Controller» API /catalog /cart" as Ctrl
+entity "«Model» CatalogService, CartService / garment, cart" as Model
+
+Cli -> UI : 1: abrir prenda
+UI -> Ctrl : 2: GET /catalog/{id}
+Ctrl -> Model : 3: get(db, garment_id)
+Model --> Ctrl : 4: detalle + variantes
+Ctrl --> UI : 5: CatalogItemRead
+UI --> Cli : 6: vista con selector
+
+Cli -> UI : 7: elegir variante
+UI -> Ctrl : 8: POST /cart/items
+Ctrl -> Model : 9: add_item(db, cart, …)
+Model --> Ctrl : 10: CartRead
+Ctrl --> UI : 11: carrito actualizado
+UI --> Cli : 12: confirmación
+
+@enduml

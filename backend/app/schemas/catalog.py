@@ -21,6 +21,8 @@ class CatalogItemRead(ORMModel):
     name: str
     description: str | None = None
     base_price: float
+    min_price: float
+    in_stock: bool
     is_ar_enabled: bool
     category: CategoryRead | None = None
     images: list["CatalogImageRead"] = []

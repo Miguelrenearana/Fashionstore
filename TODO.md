@@ -12,9 +12,9 @@ Formato:
 
 ## 🔴 Infraestructura pendiente (usuario)
 
-- [ ] **Neon**: crear proyecto PostgreSQL 16 → ejecutar
-  `CREATE EXTENSION IF NOT EXISTS vector;` (extensión pgvector) → crear branch `dev`
-  → copiar connection string (pooler o directo) al `.env` (`DATABASE_URL`).
+- [x] **Neon**: proyecto creado y conectado → `backend/.env` con `DATABASE_URL` (directa,
+  `sslmode=require`). Esquema aplicado con `alembic upgrade head` (38 tablas + `vector` 0.8.6
+  + índice ivfflat) y seed cargado. **El backend corre en localhost apuntando a esta BD.**
 - [ ] **Render**: desplegar `backend/` desde `render.yaml` (Docker). Ajustar variables de
   entorno y health check `/health`.
 - [ ] **Vercel**: importar `frontend/`, usar rewrites SPA de `vercel.json`.
@@ -26,7 +26,7 @@ Formato:
 
 ## 🟡 Técnicos
 
-- [ ] Generar **migración Alembic inicial** (todas las tablas) + `scripts/init_extensions.sql`.
+- [x] Generar **migración Alembic inicial** (todas las tablas) + `scripts/init_extensions.sql`.
 - [ ] AR: hoy se usan **placeholders PNG** en `mobile/assets/images/placeholders/`; sustituir
   por assets reales cuando existan.
 - [ ] Email: actualmente **log/consola**; conectar SendGrid/Mailgun en **Ciclo 2** (RULES §8).
@@ -34,7 +34,7 @@ Formato:
 ## 🟢 Backlog
 
 ### Ciclo 1 (en curso)
-- [ ] Base del backend (FastAPI + core + esquemas).
+- [x] Base del backend (FastAPI + core + esquemas).
 - [ ] CU-01 Gestión de usuarios / autenticación
 - [ ] CU-02 Gestión de roles y empleados
 - [ ] CU-04 Gestión de sucursales (multitienda)

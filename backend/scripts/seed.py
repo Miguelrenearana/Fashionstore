@@ -75,7 +75,7 @@ def run() -> None:
             birth_date=date(1995, 5, 20),
             points=120,
         ))
-    if not db.query(Supplier).filter(Supplier.user_id == supplier_user.id).first():
+    if not db.query(Supplier).filter(Supplier.company_name == "Textiles Andinos SRL").first():
         db.add(Supplier(
             company_name="Textiles Andinos SRL",
             contact_name="Proveedor Demo",

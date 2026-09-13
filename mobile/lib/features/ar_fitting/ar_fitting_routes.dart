@@ -1,3 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import 'ar_fitting_screen.dart';
+
 abstract class ArFittingRoutes {
   static const root = '/fitting/{variantId}';
 

@@ -16,7 +16,7 @@ class PoseService {
   /// (shoulders + hips) as a list, or an empty list if no pose found.
   Future<List<PoseLandmark>> detectLandmarks(InputImage input) async {
     final detector = PoseDetector(options: options);
-    final poses = await detector.detectPose(inputImage: input);
+    final poses = await detector.processImage(input);
     detector.close();
 
     final landmarks = <PoseLandmark>[];
@@ -29,8 +29,8 @@ class PoseService {
       };
       landmarks.addAll(
         pose.landmarks.entries
-            .where((e) => shoulders.contains(e.key) && e.value != null)
-            .map((e) => e.value!),
+            .where((e) => shoulders.contains(e.key))
+            .map((e) => e.value),
       );
     }
     return landmarks;

@@ -28,7 +28,8 @@ class Recommendation(Base, TimestampMixin):
     score: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
     is_consumed: Mapped[bool] = mapped_column(default=False, nullable=False)
 
-    suggested_variant = relationship("GarmentVariant")
+    suggested_variant = relationship("GarmentVariant", foreign_keys=[suggested_variant_id])
+    source_variant = relationship("GarmentVariant", foreign_keys=[source_variant_id])
 
 
 class PromotionStatus:

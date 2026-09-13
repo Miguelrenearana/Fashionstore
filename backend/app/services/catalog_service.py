@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.catalog import Garment
+from app.models.catalog import Garment, GarmentVariant
 
 
 class CatalogService:
@@ -16,8 +16,8 @@ class CatalogService:
         query = db.query(Garment).filter(Garment.is_active).options(
             joinedload(Garment.category),
             joinedload(Garment.images),
-            joinedload(Garment.variations).joinedload("size"),
-            joinedload(Garment.variations).joinedload("color"),
+            joinedload(Garment.variations).joinedload(GarmentVariant.size),
+            joinedload(Garment.variations).joinedload(GarmentVariant.color),
         )
         if category_id:
             query = query.filter(Garment.category_id == category_id)

@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import NotFoundError
 from app.models.user import Branch, City
@@ -10,7 +10,13 @@ class LocationService:
         return db.query(City).order_by(City.name).all()
 
     def list_branches(self, db: Session):
-        return db.query(Branch).filter(Branch.is_active).order_by(Branch.name).all()
+        return (
+            db.query(Branch)
+            .filter(Branch.is_active)
+            .options(joinedload(Branch.city))
+            .order_by(Branch.name)
+            .all()
+        )
 
     def create_branch(self, db: Session, payload: BranchCreate) -> Branch:
         if not db.get(City, payload.city_id):

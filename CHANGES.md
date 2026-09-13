@@ -4,6 +4,16 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
+## 2026-09-13 — CU-04 Sucursales y ciudades
+
+- **Backend:** `POST /locations/branches` restringido a ADMIN/MANAGER; `list_branches` precarga
+  la ciudad. **Tests:** 5 nuevas pruebas de sucursales (listados, permisos, creación, ciudad no
+  encontrada). Total: 23.
+- **Frontend:** módulo `/branch` funcional (tarjetas de sucursales + formulario de creación con
+  selector de ciudad); enlace "Sucursales" en navbar.
+- **UML + tabla CU:** `docs/uml/ciclo1/CU-04/{sequence,communication}.puml`.
+- Referencias: overleaf CU-04.
+
 ## 2026-09-13 — CU-06 Catálogo / CU-07 Detalle de producto
 
 - **Backend:** `GET /catalog/categories`; filtros por búsqueda, categoría y sucursal en
@@ -56,5 +66,5 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ## Pendiente de registrar
 
-- Ciclo 1: CU-04, 12, 13, 14, 15, 17 (+ UML + tabla de CU).
+- Ciclo 1: CU-12, 13, 14, 15, 17 (+ UML + tabla de CU).
 - Despliegue a nubes (Render/Vercel/Firebase) cuando el dueño lo solicite.

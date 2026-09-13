@@ -1,0 +1,26 @@
+@startuml CU-04
+actor "Cliente" as Cli
+actor "Admin / Manager" as Adm
+boundary "«UI» Angular (sucursales)" as UI
+control "«Controller» API /locations" as Ctrl
+entity "«Model» LocationService / branch, city" as Model
+
+Cli -> UI : Consultar sucursales
+UI -> Ctrl : GET /locations/branches
+Ctrl -> Model : list_branches(db)
+Model --> Ctrl : sucursales activas + ciudad
+Ctrl --> UI : BranchRead[]
+UI --> Cli : Mapa / tarjetas de sucursal
+
+Adm -> UI : Crear sucursal
+UI -> Ctrl : GET /locations/cities (catálogo de ciudades)
+Ctrl -> Model : list_cities(db)
+Model --> Ctrl : ciudades
+Ctrl --> UI : CityRead[]
+Adm -> UI : Guardar nueva sucursal
+UI -> Ctrl : POST /locations/branches (Bearer ADMIN/MANAGER)
+Ctrl -> Model : create_branch(db, payload)
+Model --> Ctrl : BranchRead
+Ctrl --> UI : 200 BranchRead
+
+@enduml

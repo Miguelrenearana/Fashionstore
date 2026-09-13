@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+﻿import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
@@ -9,20 +9,20 @@ import { AuthService } from '@core/auth/auth.service';
   imports: [FormsModule],
   template: `
     <section class="login">
-      <h2>Iniciar sesión</h2>
+      <h2>Iniciar sesiÃ³n</h2>
       <form (ngSubmit)="onSubmit()">
         <input
           type="email"
           name="email"
           [(ngModel)]="email"
-          placeholder="usuario@fashionstore.test"
+          placeholder="usuario@fashionstore.dev"
           required
         />
         <input
           type="password"
           name="password"
           [(ngModel)]="password"
-          placeholder="Contraseña"
+          placeholder="ContraseÃ±a"
           required
         />
         <button type="submit">Entrar</button>
@@ -68,7 +68,7 @@ export class LoginComponent {
   onSubmit(): void {
     this.auth.login(this.email, this.password).subscribe({
       next: () => this.router.navigate(['/catalog']),
-      error: () => (this.error = 'Credenciales inválidas'),
+      error: () => (this.error = 'Credenciales invÃ¡lidas'),
     });
   }
 }

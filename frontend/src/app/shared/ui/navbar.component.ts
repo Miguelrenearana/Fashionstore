@@ -17,6 +17,7 @@ import { AuthService } from '@core/auth/auth.service';
           <a routerLink="/auth" routerLinkActive="active">Iniciar sesión</a>
         } @else {
           <a routerLink="/profile" routerLinkActive="active">Perfil</a>
+          <a routerLink="/admin" routerLinkActive="active">Admin</a>
           <button (click)="auth.logout()">Salir</button>
         }
       </nav>

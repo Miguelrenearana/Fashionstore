@@ -1,0 +1,37 @@
+@startuml CU-01
+actor "Administrador" as Admin
+actor "Usuario / Empleado" as Emp
+boundary "«UI» Angular" as UI
+control "«Controller» API /auth /users" as Ctrl
+entity "«Model» UserService / user" as Model
+
+Admin -> UI : Iniciar sesión (email, contraseña)
+UI -> Ctrl : POST /auth/login
+Ctrl -> Model : authenticate(email, password)
+Model --> Ctrl : token JWT (claims + roles)
+Ctrl --> UI : access_token
+UI -> Ctrl : GET /users/me (Bearer)
+Ctrl -> Model : get(current_user)
+Model --> Ctrl : perfil + roles
+Ctrl --> UI : UserRead
+
+Emp -> UI : Listar usuarios
+UI -> Ctrl : GET /users?page=&size= (Bearer)
+Ctrl -> Model : list_users(db, page, size)
+Model --> Ctrl : lista UserRead
+Ctrl --> UI : 200 UserRead[]
+activate Admin
+Admin -> UI : Crear usuario
+UI -> Ctrl : POST /users (email, password, roles)
+Ctrl -> Model : create(db, payload)
+Model --> Ctrl : UserRead (rol asignado)
+Ctrl --> UI : 201 UserRead
+deactivate Admin
+
+Emp -> UI : Editar usuario (teléfono / activo / roles)
+UI -> Ctrl : PATCH /users/{id}
+Ctrl -> Model : update(db, user_id, payload)
+Model --> Ctrl : UserRead actualizado
+Ctrl --> UI : 200 UserRead
+
+@enduml

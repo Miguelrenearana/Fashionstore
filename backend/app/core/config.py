@@ -1,4 +1,4 @@
-from functools import lru_cache
+﻿from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
-    mail_from: str = "noreply@fashionstore.test"
+    mail_from: str = "noreply@fashionstore.dev"
 
     recommendation_embedding_model: str = "all-MiniLM-L6-v2"
     recommendation_batch_size: int = 64

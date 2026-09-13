@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.common import ORMModel
@@ -21,10 +23,15 @@ class EmployeeBase(BaseModel):
     hire_date: str | None = None
 
 
+class EmployeeCreate(EmployeeBase):
+    pass
+
+
 class EmployeeRead(EmployeeBase, ORMModel):
     id: int
     user_id: int
     branch: BranchBrief | None = None
+    hire_date: date | None = None
 
 
 class UserRead(ORMModel):

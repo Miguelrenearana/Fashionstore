@@ -1,0 +1,22 @@
+@startuml CU-01
+actor "Administrador" as Admin
+actor "Usuario / Empleado" as Emp
+boundary "«UI» Angular" as UI
+control "«Controller» API /auth /users" as Ctrl
+entity "«Model» UserService / user" as Model
+
+Admin -> UI : 1: solicitud
+UI -> Ctrl : 2: POST /auth/login
+Ctrl -> Model : 3: authenticate(email, password)
+Model --> Ctrl : 4: token JWT
+Ctrl --> UI : 5: access_token
+UI --> Admin : 6: sesión activa
+
+Emp -> UI : 7: listar/crear/editar usuarios
+UI -> Ctrl : 8: GET/POST/PATCH /users
+Ctrl -> Model : 9: operación CRUD
+Model --> Ctrl : 10: resultado
+Ctrl --> UI : 11: respuesta HTTP
+UI --> Emp : 12: vista actualizada
+
+@enduml

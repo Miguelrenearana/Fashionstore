@@ -1,4 +1,4 @@
-import secrets
+﻿import secrets
 from datetime import date, datetime
 
 from sqlalchemy.orm import Session
@@ -10,13 +10,13 @@ from app.models.catalog import Category, Collection, Color, Garment, GarmentVari
 from app.models.inventory import Inventory
 from app.models.user import Branch, City, Client, Employee, Role, Supplier, User
 
-# Credenciales demo (NUNCA usar en producción).
+# Credenciales demo (NUNCA usar en producciÃ³n).
 DEMO_PASSWORDS = {
-    "admin@fashionstore.test": "Admin123!",
-    "manager@fashionstore.test": "Manager123!",
-    "cashier@fashionstore.test": "Cashier123!",
-    "client@fashionstore.test": "Client123!",
-    "supplier@fashionstore.test": "Supplier123!",
+    "admin@fashionstore.dev": "Admin123!",
+    "manager@fashionstore.dev": "Manager123!",
+    "cashier@fashionstore.dev": "Cashier123!",
+    "client@fashionstore.dev": "Client123!",
+    "supplier@fashionstore.dev": "Supplier123!",
 }
 
 
@@ -52,11 +52,11 @@ def run() -> None:
         db.add(branch)
     db.commit()
 
-    _ensure_user(db, "admin@fashionstore.test", DEMO_PASSWORDS["admin@fashionstore.test"], "ADMIN")
-    manager_user = _ensure_user(db, "manager@fashionstore.test", DEMO_PASSWORDS["manager@fashionstore.test"], "MANAGER")
-    _ensure_user(db, "cashier@fashionstore.test", DEMO_PASSWORDS["cashier@fashionstore.test"], "CASHIER")
-    client_user = _ensure_user(db, "client@fashionstore.test", DEMO_PASSWORDS["client@fashionstore.test"], "CLIENT")
-    supplier_user = _ensure_user(db, "supplier@fashionstore.test", DEMO_PASSWORDS["supplier@fashionstore.test"], "SUPPLIER")
+    _ensure_user(db, "admin@fashionstore.dev", DEMO_PASSWORDS["admin@fashionstore.dev"], "ADMIN")
+    manager_user = _ensure_user(db, "manager@fashionstore.dev", DEMO_PASSWORDS["manager@fashionstore.dev"], "MANAGER")
+    _ensure_user(db, "cashier@fashionstore.dev", DEMO_PASSWORDS["cashier@fashionstore.dev"], "CASHIER")
+    client_user = _ensure_user(db, "client@fashionstore.dev", DEMO_PASSWORDS["client@fashionstore.dev"], "CLIENT")
+    supplier_user = _ensure_user(db, "supplier@fashionstore.dev", DEMO_PASSWORDS["supplier@fashionstore.dev"], "SUPPLIER")
     db.commit()
 
     if not db.query(Employee).filter(Employee.user_id == manager_user.id).first():
@@ -84,14 +84,14 @@ def run() -> None:
         ))
     db.commit()
 
-    season = db.query(Season).filter(Season.name == "Otoño/Invierno 2026").first()
+    season = db.query(Season).filter(Season.name == "OtoÃ±o/Invierno 2026").first()
     if not season:
-        season = Season(name="Otoño/Invierno 2026")
+        season = Season(name="OtoÃ±o/Invierno 2026")
         db.add(season)
         db.commit()
-    collection = db.query(Collection).filter(Collection.name == "Colección Urbana").first()
+    collection = db.query(Collection).filter(Collection.name == "ColecciÃ³n Urbana").first()
     if not collection:
-        collection = Collection(season_id=season.id, name="Colección Urbana", launch_year=2026)
+        collection = Collection(season_id=season.id, name="ColecciÃ³n Urbana", launch_year=2026)
         db.add(collection)
         db.commit()
 
@@ -109,12 +109,12 @@ def run() -> None:
     db.add_all([color_negro, color_blanco])
     db.commit()
 
-    if not db.query(Garment).filter(Garment.name == "Camisa Oxford Básica").first():
+    if not db.query(Garment).filter(Garment.name == "Camisa Oxford BÃ¡sica").first():
         garment = Garment(
             category_id=category.id,
             collection_id=collection.id,
-            name="Camisa Oxford Básica",
-            description="Camisa de algodón, corte regular.",
+            name="Camisa Oxford BÃ¡sica",
+            description="Camisa de algodÃ³n, corte regular.",
             base_price=180.0,
             is_ar_enabled=True,
         )

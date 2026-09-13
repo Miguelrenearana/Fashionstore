@@ -4,6 +4,29 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
+## 2026-09-13 — CU-13 Reservas / CU-14 Ventas / CU-15 Pagos
+
+- **Backend CU-13:** `POST /cart/checkout` ahora convierte el carrito en reserva (pickup_code,
+  vencimiento 30 min) reservando stock y vaciando el carrito; `GET /reservations/me`, `GET
+  /reservations/{id}`; transición de estados solo por staff (PENDING→PREPARED→IN_TRIAL) o el
+  dueño cancelando PENDING. Cancelación/vencimiento liberan `reserved_quantity`.
+- **Backend CU-14:** `POST /sales` admite `reservation_id` (venta desde reserva: consume stock
+  real + reservado, marca la reserva COMPLETED con historial y notifica) o `items` (venta directa,
+  solo staff); `GET /sales/{id}` con guardas de propiedad y `GET /sales` (staff: todas; cliente:
+  propias). `status` añadido al ORM `Sale` (PENDING/PAID/CANCELLED/REFUNDED, columna ya migrada).
+- **Backend CU-15:** `POST /payments/initiate` (auth), `/confirm` marca la venta **PAID** con
+  `paid_at` o **CANCELLED** si DECLINED, `/refund` marca la venta **REFUNDED**; gateway Mock con
+  escenarios success/declined/timeout por email.
+- Fixes: `expires_at`/`paid_at` como `datetime` en schemas; `notification_service.notify` (instancia);
+  `cart_service.add_item` elige sucursal con stock cuando el carrito no define branch; factura con
+  microsegundos (unicidad).
+- **Tests:** 5 nuevas (`tests/test_reservations.py`): checkout→reserva, cancelación con liberación
+  de stock, venta desde reserva, venta directa solo staff, flujo pago completo. Total: 33.
+- **Frontend:** `/cart` con total y botón "Reservar y check-out" (muestra el código de recogida);
+  `/reservations` con estado, vencimiento y cancelación de reservas propias.
+- **UML + tabla CU:** `docs/uml/ciclo1/CU-13|14|15/{sequence,communication}.puml` + tablas.
+- Referencias: overleaf CU-13, CU-14, CU-15.
+
 ## 2026-09-13 — CU-12 Inventario y stock
 
 - **Backend:** `GET /inventory` lista stock por sucursal con detalle de variante (prenda, SKU,
@@ -78,5 +101,5 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ## Pendiente de registrar
 
-- Ciclo 1: CU-13, 14, 15, 17 (+ UML + tabla de CU).
+- Ciclo 1: CU-17 (recomendaciones IA) (+ UML + tabla de CU).
 - Despliegue a nubes (Render/Vercel/Firebase) cuando el dueño lo solicite.

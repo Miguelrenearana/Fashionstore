@@ -1,10 +1,11 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import CurrentUser, DbSession
 from app.core.exceptions import NotFoundError
-from app.models.sales import Payment, Sale
+from app.models.sales import Payment, Sale, SalePaymentStatus, SaleStatus
 from app.payments.domain.service import PaymentService
 from app.payments.factory import get_payment_service
 from app.schemas.payment import PaymentConfirm, PaymentRead
@@ -19,7 +20,9 @@ def gateway_config():
 
 
 @router.post("/initiate", response_model=PaymentRead)
-def initiate_payment(db: DbSession, sale_id: int, gateway: str = "mock", user: CurrentUser = None):
+def initiate_payment(
+    db: DbSession, sale_id: int, method: str = "card", current: CurrentUser = None
+):
     sale = db.get(Sale, sale_id)
     if not sale:
         raise NotFoundError("Sale not found.")
@@ -27,14 +30,14 @@ def initiate_payment(db: DbSession, sale_id: int, gateway: str = "mock", user: C
     result = service.pay(
         order_reference=f"SALE-{sale.invoice_number}",
         amount=sale.total_amount,
-        customer_email=user.email,
+        customer_email=current.email if current else None,
         description=f"FashionStore order {sale.invoice_number}",
     )
     payment = Payment(
         gateway_reference=result.reference,
         sale_id=sale.id,
-        amount=result.amount if hasattr(result, "amount") else sale.total_amount,
-        method=gateway,
+        amount=sale.total_amount,
+        method=method,
         status=result.status,
     )
     db.add(payment)
@@ -56,8 +59,12 @@ def confirm_payment(
     payment = db.query(Payment).filter(Payment.gateway_reference == ref).first()
     if payment:
         payment.status = status_result.status
-        if payment.sale and status_result.succeeded:
-            payment.sale.status = "COMPLETED"
+        if payment.sale:
+            if status_result.status == SalePaymentStatus.COMPLETED:
+                payment.sale.status = SaleStatus.PAID
+                payment.sale.paid_at = datetime.now(UTC)
+            elif status_result.status == SalePaymentStatus.DECLINED:
+                payment.sale.status = SaleStatus.CANCELLED
         db.commit()
     return {"reference": ref, "status": status_result.status}
 
@@ -72,5 +79,7 @@ def refund_payment(
     payment = db.query(Payment).filter(Payment.gateway_reference == gateway_reference).first()
     if payment:
         payment.status = result.status
+        if payment.sale:
+            payment.sale.status = SaleStatus.REFUNDED
         db.commit()
     return {"reference": gateway_reference, "status": result.status}

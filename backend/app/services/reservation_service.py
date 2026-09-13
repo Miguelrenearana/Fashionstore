@@ -13,7 +13,7 @@ from app.models.reservation import (
     ReservationStatus,
 )
 from app.schemas.reservation import ReservationCreate
-from app.services import notification_service
+from app.services.notification_service import notification_service
 
 
 class ReservationService:
@@ -79,7 +79,7 @@ class ReservationService:
                 comment=comment,
             )
         )
-        if to_status in (ReservationStatus.COMPLETED.value, ReservationStatus.CANCELLED.value):
+        if to_status in (ReservationStatus.CANCELLED.value, ReservationStatus.EXPIRED.value):
             self._release_stock(db, reservation)
         db.commit()
         db.refresh(reservation)
@@ -122,7 +122,6 @@ class ReservationService:
                 ReservationStatus.EXPIRED.value,
             },
             ReservationStatus.IN_TRIAL.value: {
-                ReservationStatus.COMPLETED.value,
                 ReservationStatus.CANCELLED.value,
             },
         }

@@ -22,12 +22,9 @@ class CartService:
         if detail:
             detail.quantity += quantity
         else:
-            inventory = db.query(Inventory).filter(
-                Inventory.branch_id == (cart.branch_id or 0),
-                Inventory.variant_id == variant_id,
-            ).first()
+            inventory = self._find_inventory(db, cart, variant_id)
             if not inventory:
-                raise NotFoundError("Variant not available in this branch.")
+                raise NotFoundError("Variant not available in any branch.")
             unit_price = inventory.variant.price if inventory.variant else 0
             detail = CartDetail(
                 cart=cart,
@@ -39,6 +36,20 @@ class CartService:
         db.commit()
         db.refresh(cart)
         return cart
+
+    @staticmethod
+    def _find_inventory(db: Session, cart: Cart, variant_id: int) -> Inventory | None:
+        query = db.query(Inventory).filter(Inventory.variant_id == variant_id)
+        if cart.branch_id:
+            inventory = query.filter(Inventory.branch_id == cart.branch_id).first()
+            if inventory:
+                return inventory
+            return None
+        inventory = query.filter(Inventory.quantity > 0).order_by(Inventory.id).first()
+        if inventory:
+            cart.branch_id = inventory.branch_id
+            return inventory
+        return None
 
     def clear(self, db: Session, cart: Cart) -> None:
         for detail in list(cart.details):

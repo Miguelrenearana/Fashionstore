@@ -7,6 +7,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models import Base, TimestampMixin
 
 
+class SaleStatus:
+    PENDING = "PENDING"
+    PAID = "PAID"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
+
+
 class Sale(Base, TimestampMixin):
     __tablename__ = "venta"
 
@@ -18,10 +25,13 @@ class Sale(Base, TimestampMixin):
     reservation_id: Mapped[int | None] = mapped_column(ForeignKey("reserva.id"))
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     payment_method: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default=SaleStatus.PENDING, nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     details = relationship("SaleDetail", back_populates="sale", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="sale")
+    reservation = relationship("Reservation")
+    client = relationship("Client")
 
 
 class SaleDetail(Base, TimestampMixin):

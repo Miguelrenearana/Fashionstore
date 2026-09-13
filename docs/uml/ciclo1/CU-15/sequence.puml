@@ -1,0 +1,35 @@
+@startuml CU-15
+actor "Staff (caja)" as Staff
+boundary "«UI» Angular / API clients" as UI
+control "«Controller» API /payments" as Ctrl
+entity "«Service» PaymentService (domain)" as Svc
+entity "«Adapter» MockGateway / PagosNetGateway" as Gtw
+entity "«Model» Payment / Sale" as Model
+
+Staff -> UI : Iniciar cobro de la venta
+UI -> Ctrl : POST /payments/initiate?sale_id=X
+Ctrl -> Svc : pay(order_reference, amount)
+Svc -> Gtw : create_payment(request)
+Gtw --> Svc : PaymentResult (reference, status=PENDING, payment_url)
+Svc --> Ctrl : resultado
+Ctrl -> Model : crear Payment (gateway_reference, monto, método)
+Ctrl --> UI : PaymentRead
+
+Staff -> UI : Confirmar resultado del pago
+UI -> Ctrl : POST /payments/confirm {gateway_reference}
+Ctrl -> Svc : status(reference)
+Svc -> Gtw : get_status(reference)
+Gtw --> Svc : COMPLETED / DECLINED
+Svc --> Ctrl : estado
+Ctrl -> Model : Payment.status → venta PAID + paid_at (o CANCELLED)
+Ctrl --> UI : {reference, status}
+
+Staff -> UI : Devolución (refund)
+UI -> Ctrl : POST /payments/refund?gateway_reference=…
+Ctrl -> Svc : refund(reference)
+Svc -> Gtw : refund(reference)
+Gtw --> Svc : REFUNDED
+Ctrl -> Model : Payment.status → venta REFUNDED
+Ctrl --> UI : {reference, status}
+
+@enduml

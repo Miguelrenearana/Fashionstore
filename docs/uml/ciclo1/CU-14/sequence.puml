@@ -1,0 +1,27 @@
+@startuml CU-14
+actor "Staff (caja)" as Staff
+boundary "«UI» Angular / API clients" as UI
+control "«Controller» API /sales, /reservations" as Ctrl
+entity "«Model» SalesService / ReservationService / Inventory" as Model
+database "BD PostgreSQL" as DB
+
+Staff -> UI : Seleccionar reserva a completar
+UI -> Ctrl : POST /sales {reservation_id}
+Ctrl -> Model : create_sale(db, reservation)
+Model -> Model : consume stock (quantity y reserved_quantity)
+Model -> DB : venta + detalle + reserva COMPLETED + historial
+Model --> Ctrl : Sale (PENDING)
+Ctrl --> UI : SaleRead
+
+Staff -> UI : Venta directa
+UI -> Ctrl : POST /sales {branch_id, items}
+Ctrl -> Model : create_sale(db, items) → descuenta stock disponible
+Ctrl --> UI : SaleRead
+
+Staff -> UI : Consultar venta
+UI -> Ctrl : GET /sales/{id}
+Ctrl -> Model : get(db, sale_id)
+Model --> Ctrl : Sale + detalles
+Ctrl --> UI : SaleRead
+
+@enduml

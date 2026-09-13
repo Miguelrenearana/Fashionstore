@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
@@ -28,7 +30,7 @@ class ReservationRead(ORMModel):
     branch_id: int
     status: str
     pickup_code: str
-    expires_at: str
+    expires_at: datetime
     total_amount: float
     details: list[ReservationDetailRead] = []
 

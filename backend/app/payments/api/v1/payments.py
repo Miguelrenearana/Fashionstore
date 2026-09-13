@@ -1,0 +1,76 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from app.core.dependencies import CurrentUser, DbSession
+from app.core.exceptions import NotFoundError
+from app.models.sales import Payment, Sale
+from app.payments.domain.service import PaymentService
+from app.payments.factory import get_payment_service
+from app.schemas.payment import PaymentConfirm, PaymentRead
+
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+@router.get("/config")
+def gateway_config():
+    service = get_payment_service()
+    return {"gateway": service.gateway.name}
+
+
+@router.post("/initiate", response_model=PaymentRead)
+def initiate_payment(db: DbSession, sale_id: int, gateway: str = "mock", user: CurrentUser = None):
+    sale = db.get(Sale, sale_id)
+    if not sale:
+        raise NotFoundError("Sale not found.")
+    service: PaymentService = get_payment_service()
+    result = service.pay(
+        order_reference=f"SALE-{sale.invoice_number}",
+        amount=sale.total_amount,
+        customer_email=user.email,
+        description=f"FashionStore order {sale.invoice_number}",
+    )
+    payment = Payment(
+        gateway_reference=result.reference,
+        sale_id=sale.id,
+        amount=result.amount if hasattr(result, "amount") else sale.total_amount,
+        method=gateway,
+        status=result.status,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return payment
+
+
+@router.post("/confirm")
+def confirm_payment(
+    db: DbSession,
+    payload: PaymentConfirm,
+    service: Annotated[PaymentService, Depends(get_payment_service)],
+):
+    ref = payload.gateway_reference or payload.token
+    if not ref:
+        raise NotFoundError("Missing payment reference.")
+    status_result = service.status(ref)
+    payment = db.query(Payment).filter(Payment.gateway_reference == ref).first()
+    if payment:
+        payment.status = status_result.status
+        if payment.sale and status_result.succeeded:
+            payment.sale.status = "COMPLETED"
+        db.commit()
+    return {"reference": ref, "status": status_result.status}
+
+
+@router.post("/refund")
+def refund_payment(
+    db: DbSession,
+    gateway_reference: str,
+    service: Annotated[PaymentService, Depends(get_payment_service)],
+):
+    result = service.refund(gateway_reference)
+    payment = db.query(Payment).filter(Payment.gateway_reference == gateway_reference).first()
+    if payment:
+        payment.status = result.status
+        db.commit()
+    return {"reference": gateway_reference, "status": result.status}

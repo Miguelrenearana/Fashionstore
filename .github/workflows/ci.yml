@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  backend:
+    name: Backend — lint + tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg://fashion:change-me@localhost:5432/fashionstore
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: fashion
+          POSTGRES_PASSWORD: change-me
+          POSTGRES_DB: fashionstore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fashion -d fashionstore"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install backend deps
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Ruff lint
+        working-directory: backend
+        run: ruff check app scripts
+      - name: Apply migrations
+        working-directory: backend
+        run: alembic upgrade head
+      - name: Seed
+        working-directory: backend
+        run: python -m scripts.seed
+      - name: Tests
+        working-directory: backend
+        run: pytest -q
+
+  frontend:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install + build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build

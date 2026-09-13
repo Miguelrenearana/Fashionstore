@@ -1,0 +1,24 @@
+name: fashionstore
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: fashionstore_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fashion
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: fashionstore
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backend/scripts/init_extensions.sql:/docker-entrypoint-initdb.d/init_extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fashion -d fashionstore"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:

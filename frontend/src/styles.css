@@ -1,0 +1,25 @@
+:root {
+  --color-primary: #7a1f36;
+  --color-secondary: #f2e8dc;
+  --color-text: #1f1f1f;
+  --color-muted: #6b6b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--color-text);
+  background: #fafafa;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+button {
+  cursor: pointer;
+}

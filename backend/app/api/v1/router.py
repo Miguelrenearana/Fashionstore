@@ -1,0 +1,31 @@
+from fastapi import APIRouter
+
+from app.api.v1.routes_auth import router as auth_router
+from app.api.v1.routes_cart import router as cart_router
+from app.api.v1.routes_catalog import router as catalog_router
+from app.api.v1.routes_inventory import router as inventory_router
+from app.api.v1.routes_locations import router as locations_router
+from app.api.v1.routes_notifications import router as notifications_router
+from app.api.v1.routes_products import router as products_router
+from app.api.v1.routes_reception import router as reception_router
+from app.api.v1.routes_recommendations import router as recommendations_router
+from app.api.v1.routes_reservations import router as reservations_router
+from app.api.v1.routes_sales import router as sales_router
+from app.api.v1.routes_users import router as users_router
+from app.payments.api.v1.payments import router as payments_router
+
+api_router = APIRouter()
+
+api_router.include_router(auth_router)
+api_router.include_router(users_router)
+api_router.include_router(locations_router)
+api_router.include_router(catalog_router)
+api_router.include_router(products_router)
+api_router.include_router(inventory_router)
+api_router.include_router(reservations_router)
+api_router.include_router(cart_router)
+api_router.include_router(sales_router)
+api_router.include_router(reception_router)
+api_router.include_router(recommendations_router)
+api_router.include_router(notifications_router)
+api_router.include_router(payments_router)

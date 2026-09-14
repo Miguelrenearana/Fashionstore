@@ -57,5 +57,25 @@ class CartService:
         cart.is_active = False
         db.commit()
 
+    def update_item(self, db: Session, cart: Cart, variant_id: int, quantity: int) -> Cart:
+        if quantity <= 0:
+            raise ValidationError("Quantity must be positive.")
+        detail = next((d for d in cart.details if d.variant_id == variant_id), None)
+        if not detail:
+            raise NotFoundError("Variant is not in the cart.")
+        detail.quantity = quantity
+        db.commit()
+        db.refresh(cart)
+        return cart
+
+    def remove_item(self, db: Session, cart: Cart, variant_id: int) -> Cart:
+        detail = next((d for d in cart.details if d.variant_id == variant_id), None)
+        if not detail:
+            raise NotFoundError("Variant is not in the cart.")
+        db.delete(detail)
+        db.commit()
+        db.refresh(cart)
+        return cart
+
 
 cart_service = CartService()

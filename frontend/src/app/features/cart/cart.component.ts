@@ -21,6 +21,18 @@ interface Reservation {
   total_amount: number;
 }
 
+interface PurchaseResult {
+  sale: { id: number; invoice_number: string; status: string; total_amount: number };
+  payment: { id: number; gateway_reference: string; status: string };
+}
+
+interface Receipt {
+  id: number;
+  type: string;
+  rnc_or_cuf: string | null;
+  document_url: string | null;
+}
+
 @Component({
   selector: 'app-cart',
   standalone: true,
@@ -36,16 +48,31 @@ interface Reservation {
           — Total: Bs {{ reservation()?.total_amount }}
         </p>
       }
+      @if (purchase()) {
+        <p class="ok">
+          <strong>¡Compra registrada!</strong> Factura {{ purchase()?.sale?.invoice_number }} —
+          Total: Bs {{ purchase()?.sale?.total_amount }}
+        </p>
+      }
       @for (item of items(); track item.id) {
-        <p>Variante #{{ item.variant_id }} × {{ item.quantity }} — Bs {{ item.unit_price }}</p>
+        <div class="line">
+          <span>Variante #{{ item.variant_id }} — Bs {{ item.unit_price }}</span>
+          <button (click)="changeQty(item, item.quantity - 1)">−</button>
+          <span>{{ item.quantity }}</span>
+          <button (click)="changeQty(item, item.quantity + 1)">+</button>
+          <button class="link" (click)="remove(item)">quitar</button>
+        </div>
       } @empty {
-        @if (!reservation()) {
+        @if (!reservation() && !purchase()) {
           <p>Tu carrito está vacío.</p>
         }
       }
       @if (items().length > 0) {
         <p class="total">Total: Bs {{ total() }}</p>
-        <button (click)="checkout()" [disabled]="loading">Reservar y check-out</button>
+        <div class="actions">
+          <button (click)="checkout()" [disabled]="loading">Reservar y check-out</button>
+          <button class="primary" (click)="purchaseCart()" [disabled]="loading">Comprar ahora</button>
+        </div>
       }
     </section>
   `,
@@ -56,9 +83,26 @@ interface Reservation {
         max-width: 640px;
         margin: 0 auto;
       }
+      .line {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #eee;
+      }
       .total {
         font-weight: 700;
         margin-top: 1rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.6rem;
+        margin-top: 0.5rem;
+      }
+      .primary {
+        background: var(--color-primary);
+        color: #fff;
+        border: none;
       }
       .error {
         color: #b00020;
@@ -71,7 +115,13 @@ interface Reservation {
       }
       button {
         cursor: pointer;
-        padding: 0.4rem 1rem;
+        padding: 0.35rem 0.7rem;
+      }
+      .link {
+        background: none;
+        border: none;
+        color: var(--color-primary);
+        text-decoration: underline;
       }
     `,
   ],
@@ -81,14 +131,49 @@ export class CartComponent {
   readonly items = signal<CartItem[]>([]);
   readonly total = signal(0);
   readonly reservation = signal<Reservation | null>(null);
+  readonly purchase = signal<PurchaseResult | null>(null);
   loading = false;
   error = '';
 
   constructor() {
+    this.loadCart();
+  }
+
+  private loadCart(): void {
     this.http.get<CartState>(`${environment.apiUrl}/cart`).subscribe((res) => {
       this.items.set(res.details);
       this.total.set(res.total);
     });
+  }
+
+  changeQty(item: CartItem, quantity: number): void {
+    if (quantity < 1) {
+      return;
+    }
+    this.http
+      .patch<CartState>(`${environment.apiUrl}/cart/items/${item.variant_id}`, {
+        variant_id: item.variant_id,
+        quantity,
+      })
+      .subscribe({
+        next: (res) => {
+          this.items.set(res.details);
+          this.total.set(res.total);
+        },
+        error: (e) => (this.error = e.error?.detail ?? 'No se pudo actualizar la línea.'),
+      });
+  }
+
+  remove(item: CartItem): void {
+    this.http
+      .delete<CartState>(`${environment.apiUrl}/cart/items/${item.variant_id}`)
+      .subscribe({
+        next: (res) => {
+          this.items.set(res.details);
+          this.total.set(res.total);
+        },
+        error: (e) => (this.error = e.error?.detail ?? 'No se pudo quitar el producto.'),
+      });
   }
 
   checkout(): void {
@@ -99,11 +184,34 @@ export class CartComponent {
       .subscribe({
         next: (res) => {
           this.reservation.set(res);
+          this.purchase.set(null);
           this.items.set([]);
           this.total.set(0);
         },
         error: (e) => {
           this.error = e.error?.detail ?? 'No se pudo generar la reserva.';
+        },
+      })
+      .add(() => (this.loading = false));
+  }
+
+  purchaseCart(): void {
+    this.loading = true;
+    this.error = '';
+    this.http
+      .post<PurchaseResult>(`${environment.apiUrl}/cart/purchase`, {
+        branch_id: null,
+        payment_method: 'card',
+      })
+      .subscribe({
+        next: (res) => {
+          this.purchase.set(res);
+          this.reservation.set(null);
+          this.items.set([]);
+          this.total.set(0);
+        },
+        error: (e) => {
+          this.error = e.error?.detail ?? 'No se pudo completar la compra.';
         },
       })
       .add(() => (this.loading = false));

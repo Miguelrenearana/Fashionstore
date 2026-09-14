@@ -24,6 +24,21 @@ def my_reservations(db: DbSession, current: CurrentUser):
     return db.query(Reservation).filter(Reservation.client_id == client_id).all()
 
 
+@router.get("", response_model=list[ReservationRead])
+def list_reservations(db: DbSession, current: CurrentUser, status: str | None = None):
+    """CU-17/18: staff view of reservations (e.g. what to prepare)."""
+    user_roles = {r.name for r in current.roles}
+    is_staff = bool(user_roles.intersection(_STAFF_ROLES)) or db.query(Employee).filter(
+        Employee.user_id == current.id
+    ).first()
+    if not is_staff:
+        raise ForbiddenError("Only staff can list reservations.")
+    query = db.query(Reservation)
+    if status:
+        query = query.filter(Reservation.status == status.upper())
+    return query.order_by(Reservation.id.desc()).all()
+
+
 @router.get("/{reservation_id}", response_model=ReservationRead)
 def get_reservation(db: DbSession, reservation_id: int, current: CurrentUser):
     reservation = _must_get(db, reservation_id)

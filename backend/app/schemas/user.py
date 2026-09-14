@@ -54,3 +54,30 @@ class UserUpdate(BaseModel):
     phone: str | None = None
     roles: list[str] | None = None
     is_active: bool | None = None
+
+
+class SupplierCreate(BaseModel):
+    company_name: str = Field(min_length=2, max_length=150)
+    contact_name: str | None = None
+    email: EmailStr | None = None
+    phone: str | None = None
+    address: str | None = None
+
+
+class SupplierUpdate(BaseModel):
+    company_name: str | None = Field(default=None, min_length=2, max_length=150)
+    contact_name: str | None = None
+    email: EmailStr | None = None
+    phone: str | None = None
+    address: str | None = None
+    is_active: bool | None = None
+
+
+class SupplierRead(ORMModel):
+    id: int
+    company_name: str
+    contact_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    is_active: bool

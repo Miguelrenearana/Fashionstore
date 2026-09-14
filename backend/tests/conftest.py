@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.core.database import SessionLocal
 from app.main import app
-from app.models.user import Employee, User
+from app.models.analytics import BrowsingHistory, Notification
+from app.models.user import Client, Employee, PasswordReset, User
 
 
 @pytest.fixture
@@ -53,6 +54,11 @@ def cleanup_users():
             user = db.query(User).filter(User.email == email).first()
             if not user:
                 continue
+            db.query(Notification).filter(Notification.user_id == user.id).delete()
+            db.query(PasswordReset).filter(PasswordReset.user_id == user.id).delete()
+            client = db.query(Client).filter(Client.user_id == user.id).first()
+            if client:
+                db.query(BrowsingHistory).filter(BrowsingHistory.client_id == client.id).delete()
             db.query(Employee).filter(Employee.user_id == user.id).delete()
             db.delete(user)
         db.commit()

@@ -57,6 +57,7 @@ from app.models.user import (  # noqa: E402, F401
     City,
     Client,
     Employee,
+    PasswordReset,
     Role,
     Supplier,
     User,

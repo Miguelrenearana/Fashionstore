@@ -27,6 +27,11 @@ import { AuthService } from '@core/auth/auth.service';
         />
         <button type="submit">Entrar</button>
       </form>
+      <p>
+        <a routerLink="/auth/forgot-password">Olvidé mi contraseña</a>
+        ·
+        <a routerLink="/auth/register">Crear cuenta</a>
+      </p>
       @if (error) {
         <p class="error">{{ error }}</p>
       }

@@ -42,4 +42,9 @@ export class AuthService {
   isAuthenticated(): boolean {
     return this.token() !== null;
   }
+
+  storeToken(access_token: string): void {
+    localStorage.setItem('fs_token', access_token);
+    this.token.set(access_token);
+  }
 }

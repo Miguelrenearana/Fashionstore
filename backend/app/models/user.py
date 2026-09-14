@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base, SoftDeleteMixin, TimestampMixin
@@ -104,3 +104,17 @@ class Client(Base, TimestampMixin, SoftDeleteMixin):
     user = relationship("User")
     carts = relationship("Cart", back_populates="client")
     reservations = relationship("Reservation", back_populates="client")
+
+
+class PasswordReset(Base, TimestampMixin):
+    """Recovery tokens for CU-03 (Recuperar contrasena)."""
+
+    __tablename__ = "password_reset"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("usuario.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

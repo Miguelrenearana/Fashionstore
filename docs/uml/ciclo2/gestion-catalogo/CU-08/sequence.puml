@@ -1,0 +1,32 @@
+@startuml CU-08
+actor "Administrador / Gestor de catálogo" as Adm
+boundary "«UI» Angular (admin)" as UI
+control "«Controller» API /catalog/options" as Ctrl
+entity "«Model» CatalogConfigService / Category, Size, Color" as Model
+
+Adm -> UI : Abre gestión de catálogo y crea categorías
+UI -> Ctrl : POST /catalog/options/categories
+Ctrl -> Model : create_category(db, data)
+Model --> Ctrl : CategoryRead
+Ctrl --> UI : CategoryRead
+UI --> Adm : Categoría creada (lista actualizada)
+
+Adm -> UI : Crea tallas y colores
+UI -> Ctrl : POST /catalog/options/sizes | /colors
+Ctrl -> Model : create_size/color(db, data)
+Model --> Ctrl : SizeRead / ColorRead
+Ctrl --> UI : SizeRead / ColorRead
+
+Adm -> UI : Consulta y corrige las opciones
+UI -> Ctrl : PATCH /catalog/options/sizes/{id} | /colors/{id}
+Ctrl -> Model : update_size/color(db, id, data)
+Model --> Ctrl : SizeRead / ColorRead
+Ctrl --> UI : SizeRead / ColorRead
+
+Adm -> UI : Consulta el catálogo público
+UI -> Ctrl : GET /catalog/options/sizes | /colors
+Ctrl -> Model : list_sizes/colors(db)
+Model --> Ctrl : list[SizeRead/ColorRead]
+Ctrl --> UI : list[SizeRead/ColorRead]
+
+@enduml

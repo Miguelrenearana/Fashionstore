@@ -1,0 +1,33 @@
+@startuml CU-09
+actor "Administrador / Gestor de catálogo" as Adm
+boundary "«UI» Angular (admin)" as UI
+control "«Controller» API /catalog/options" as Ctrl
+entity "«Model» CatalogConfigService / Season, Collection" as Model
+
+Adm -> UI : Crea una temporada (Ej. "Otoño/Invierno 2026")
+UI -> Ctrl : POST /catalog/options/seasons
+Ctrl -> Model : create_season(db, data)
+Model --> Ctrl : SeasonRead
+Ctrl --> UI : SeasonRead
+UI --> Adm : Temporada creada
+
+Adm -> UI : Crea una colección asociada a la temporada
+UI -> Ctrl : POST /catalog/options/collections
+Ctrl -> Model : create_collection(db, data)
+Model --> Ctrl : CollectionRead (incluye is_active)
+Ctrl --> UI : CollectionRead
+UI --> Adm : Colección creada
+
+Adm -> UI : Edita o activa/desactiva la colección
+UI -> Ctrl : PATCH /catalog/options/collections/{id}
+Ctrl -> Model : update_collection(db, id, data)
+Model --> Ctrl : CollectionRead
+Ctrl --> UI : CollectionRead
+
+Adm -> UI : Consulta temporadas y colecciones activas
+UI -> Ctrl : GET /catalog/options/seasons | /collections
+Ctrl -> Model : list_seasons/list_collections(db)
+Model --> Ctrl : list[SeasonRead/CollectionRead]
+Ctrl --> UI : Temporadas y colecciones (front tienda)
+
+@enduml

@@ -1,0 +1,33 @@
+@startuml CU-20
+actor "Cliente" as Cli
+boundary "«UI» Angular (carrito de compras)" as UI
+control "«Controller» API /cart" as Ctrl
+entity "«Model» CartService / Cart / Sale / Payment" as Model
+
+Cli -> UI : 1: abrir carrito
+UI -> Ctrl : 2: GET /cart
+Ctrl -> Model : 3: get_active_cart(db, user_id)
+Model --> Ctrl : 4: CartRead
+Ctrl --> UI : 5: CartRead
+UI --> Cli : 6: carrito mostrado
+
+Cli -> UI : 7: actualizar cantidad
+UI -> Ctrl : 8: PATCH /cart/items/{variant_id}
+Ctrl -> Model : 9: update_item(db, cart, variant_id, quantity)
+Model --> Ctrl : 10: CartRead actualizado
+Ctrl --> UI : 11: total recalculado
+
+Cli -> UI : 12: quitar prenda
+UI -> Ctrl : 13: DELETE /cart/items/{variant_id}
+Ctrl -> Model : 14: remove_item(db, cart, variant_id)
+Model --> Ctrl : 15: CartRead
+Ctrl --> UI : 16: carrito sin la prenda
+
+Cli -> UI : 17: comprar carrito
+UI -> Ctrl : 18: POST /cart/purchase
+Ctrl -> Model : 19: create_sale + pay + desactivar carrito
+Model --> Ctrl : 20: PurchaseResponse {sale, payment}
+Ctrl --> UI : 21: PurchaseResponse
+UI --> Cli : 22: avanza al flujo de pago (CU-21)
+
+@enduml

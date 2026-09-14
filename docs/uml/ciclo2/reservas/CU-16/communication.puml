@@ -1,0 +1,21 @@
+@startuml CU-16
+actor "Cliente" as Cli
+boundary "«UI» Angular (mis reservas)" as UI
+control "«Controller» API /reservations" as Ctrl
+entity "«Model» ReservationService / Reservation" as Model
+
+Cli -> UI : 1: consultar mis reservas
+UI -> Ctrl : 2: GET /reservations
+Ctrl -> Model : 3: get_my_reservations(db, user_id)
+Model --> Ctrl : 4: list[ReservationRead]
+Ctrl --> UI : 5: list[ReservationRead]
+UI --> Cli : 6: reservas mostradas
+
+Cli -> UI : 7: cancelar reserva
+UI -> Ctrl : 8: PATCH /reservations/{id}/cancel
+Ctrl -> Model : 9: cancel(db, reservation)
+Model --> Ctrl : 10: ReservationRead (CANCELLED)
+Ctrl --> UI : 11: ReservationRead
+UI --> Cli : 12: reserva cancelada
+
+@enduml

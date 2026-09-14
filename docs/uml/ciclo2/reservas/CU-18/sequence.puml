@@ -1,0 +1,21 @@
+@startuml CU-18
+actor "Encargado de sucursal" as Stf
+boundary "«UI» Angular (gestión de reservas)" as UI
+control "«Controller» API /reservations" as Ctrl
+entity "«Model» ReservationService / Reservation / Inventory" as Model
+
+Stf -> UI : Abre el listado de reservas recibidas
+UI -> Ctrl : GET /reservations?status=
+Ctrl -> Model : list_staff(db, user, status?) → valida rol/empleado
+Model --> Ctrl : list[ReservationRead]
+Ctrl --> UI : list[ReservationRead]
+UI --> Stf : Reservas de la sucursal
+
+Stf -> UI : Marca como preparadas las prendas reservadas
+UI -> Ctrl : PATCH /reservations/{id}/status (PREPARED)
+Ctrl -> Model : transition(PENDING → PREPARED)
+Model --> Ctrl : ReservationRead (PREPARED)
+Ctrl --> UI : ReservationRead
+UI --> Stf : Prendas preparadas para probar
+
+@enduml

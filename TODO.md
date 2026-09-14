@@ -52,17 +52,21 @@ Formato:
 > (`docs/uml/ciclo1/{autenticacion-usuarios,gestion-catalogo,reservas}/CU-XX/`).
 > Pagos e inventario/ajustes y recomendaciones IA se evalúan en Ciclo 2.
 
-### Ciclo 2
-- [ ] CU-03 Gestión de clientes
-- [ ] CU-05 Gestión de catálogo (categorías/colecciones)
-- [ ] CU-08 Gestión de promociones
-- [ ] CU-09 Carrito de compras
-- [ ] CU-10 Venta en punto de venta (POS)
-- [ ] CU-16 Facturación / comprobantes
-- [ ] CU-18 Recepción de producto (proveedores)
-- [ ] CU-19 Gestión de proveedores
-- [ ] CU-20 Notificaciones
-- [ ] CU-21 Historial de navegación / seguimiento
-- [ ] CU-23 Cierre de caja
-- [ ] CU-24 Reportes de ventas
-- [ ] Email → SendGrid/Mailgun (item 🟡).
+### Ciclo 2 (completado — tag `v2.0.0-ciclo2`)
+- [x] CU-03 Recuperar contraseña (+ UML)
+- [x] CU-05 Registro y gestión de perfil de cliente (+ UML)
+- [x] CU-08 Gestión de categorías, tallas y colores (+ UML)
+- [x] CU-09 Gestión de temporadas y colecciones (+ UML)
+- [x] CU-10 Gestión de proveedores (+ UML)
+- [x] CU-16 Consulta y cancelación de reservas (+ UML)
+- [x] CU-18 Preparación de prendas reservadas (+ UML)
+- [x] CU-19 Probador virtual AR móvil (+ UML)
+- [x] CU-20 Gestión del carrito de compras (+ UML)
+- [x] CU-21 Realizar compra en línea (+ UML)
+- [x] CU-23 Venta presencial (POS) (+ UML)
+- [x] CU-24 Pago en caja y comprobante (+ UML)
+- [x] UML (secuencia + comunicación) por paquete y numeración oficial (`docs/uml/ciclo2/`).
+
+> Nota: diagramas y tablas usan la **numeración oficial** del proyecto. El email real
+> (SendGrid/Mailgun) queda en backlog; hoy se usa el mock de notificaciones (RULES §8).
+> El warp 2D guiado por pose con assets reales del probador AR queda para Ciclo 3 (congelado).

@@ -4,7 +4,54 @@ Formato: fecha · resumen · referencias (overleaf-caso de uso si aplica).
 
 ---
 
-## 2026-09-13 — Renumeración UML a casos de uso oficiales (Ciclo 1)
+## 2026-09-13 — Ciclo 2 (autenticación, catálogo, reservas, ventas y pagos)
+
+- **CU-03 Recuperar contraseña / CU-05 Registro y perfil de cliente:**
+  - Backend: modelo `PasswordReset` (tabla `password_reset`, hash del token + expiración 30 min)
+    y migración `0002_ci2_extra`; `POST /auth/register`, `POST /auth/forgot-password`,
+    `POST /auth/reset-password` (email mock vía notificaciones); `GET/PATCH /clients/me`.
+    `register_client` crea `User` (CLIENT) + `Client` y devuelve JWT (sesión automática).
+  - Frontend: componentes `register`, `forgot-password`, `reset-password`; perfil reescrito
+    contra `/clients/me` con formulario de edición; `storeToken` en `auth.service`.
+  - Tests: `test_cu03_cu05.py` (8). `conftest` limpia ahora Notification/PasswordReset/
+    BrowsingHistory/Employee/Client antes de borrar el usuario.
+- **CU-08 Categorías/tallas/colores · CU-09 Temporadas/colecciones · CU-10 Proveedores:**
+  - Backend: `catalog_config_service` y `supplier_service`; rutas `GET /catalog/options/…`
+    (públicas) y `POST/PATCH` (ADMIN/MANAGER); `GET/POST/PATCH /suppliers` (mutaciones
+    ADMIN/MANAGER).
+  - Frontend: sección "Gestión de catálogo" en `/admin` (tallas, colores, temporadas,
+    categorías, colecciones y proveedores con formularios de creación y listas).
+  - Tests: `test_cu08_cu09_cu10.py` (8).
+- **CU-16 Consulta/cancelación de reservas · CU-18 Preparación de prendas:**
+  - `GET /reservations` (staff, con filtro `?status=`; staff = rol ADMIN/MANAGER/CASHIER o
+    empleado) añadido; la consulta propia y la cancelación por el cliente ya existían del
+    Ciclo 1. Tests: `test_cu16_cu18.py` (5).
+- **CU-19 Probador virtual (AR móvil):**
+  - `ar_fitting_screen.dart` reescrito: preview real de cámara (`camera`), detección de pose
+    por frame (`google_mlkit_pose_detection`) dibujando hombros/caderas, overlay de prenda
+    arrastrable/escalable y controles (mostrar prenda, detectar pose, reajustar, capturar).
+    Painter extendido con offset/escala/landmarks; `google_mlkit_commons` añadido al pubspec.
+    `flutter analyze` limpio.
+- **CU-20 Carrito de compras · CU-21 Compra en línea:**
+  - Backend: `PATCH/DELETE /cart/items/{variant_id}` y `POST /cart/purchase` (crea la venta
+    desde el carrito, inicia el pago, desactiva el carrito y responde `{sale, payment}`).
+  - Frontend: carrito reescrito con ±cantidad, quitar y "Comprar ahora".
+  - Tests: `test_cu20_cu21.py` (4).
+- **CU-23 Venta presencial · CU-24 Pago en caja y comprobante:**
+  - Backend: `receipt_service` (factura `CUF-…`/nota de crédito `NC-…` por tipo, dedup por
+    venta); `payments.confirm` COMPLETED genera factura y REFUNDED genera nota de crédito;
+    `GET /sales/{id}/receipt`.
+  - Frontend: POS reescrito (registrar venta → cobrar → confirmar → mostrar/descargar
+    comprobante).
+  - Tests: `test_cu23_cu24.py` (2).
+- **UML Ciclo 2:** `docs/uml/ciclo2/` organizado por paquete y numeración oficial
+  (12 CU × {sequence,communication,CU-XX.md}; `README.md` actualizado).
+- **Calidad:** suite backend completa: **63 tests** (1 warning) contra BD Neon; `ruff
+  check app alembic tests scripts` limpio; `npm run build` OK; `flutter analyze` OK.
+- Referencias: overleaf CU-03, CU-05, CU-08, CU-09, CU-10, CU-16, CU-18, CU-19, CU-20,
+  CU-21, CU-23, CU-24.
+
+---
 
 - **Docs:** `docs/uml/ciclo1/` reorganizado por **paquete** con la **numeración oficial** del
   proyecto (cada CU del examen es un caso de uso aparte):

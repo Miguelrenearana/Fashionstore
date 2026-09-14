@@ -1,0 +1,21 @@
+@startuml CU-19
+actor "Cliente" as Cli
+boundary "«UI» Flutter (probador virtual)" as UI
+control "«Controller» local (sensor de pose)" as Ctrl
+entity "«Model» PoseService / CameraController / GarmentOverlay" as Model
+
+Cli -> UI : 1: abrir probador virtual (variante)
+UI -> Ctrl : 2: inicializar cámara (startImageStream)
+Ctrl -> Model : 3: availableCameras() → CameraController
+Model --> Ctrl : 4: preview activo
+Ctrl --> Model : 5: InputImage por frame
+Model --> Ctrl : 6: landmarks (hombros/caderas)
+Ctrl --> UI : 7: puntos de pose sobre el video
+
+Cli -> UI : 8: arrastrar/escalar prenda
+UI -> Ctrl : 9: onScaleUpdate (offset + escala)
+Ctrl --> UI : 10: overlay reposicionado
+Cli -> UI : 11: capturar vista
+UI --> Cli : 12: foto simulada con overlay
+
+@enduml

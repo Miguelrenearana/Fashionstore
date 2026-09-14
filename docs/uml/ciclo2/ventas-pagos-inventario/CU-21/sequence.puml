@@ -1,0 +1,25 @@
+@startuml CU-21
+actor "Cliente" as Cli
+boundary "«UI» Angular (tienda / carrito)" as UI
+control "«Controller» API /cart, /payments" as Ctrl
+entity "«Model» SalesService / PaymentService / Sale / Payment" as Model
+
+Cli -> UI : Compra desde el carrito (CU-20) o un producto directo
+UI -> Ctrl : POST /cart/purchase {payment_method}
+Ctrl -> Model : create_sale(db, cart) + Pago iniciado
+Model --> Ctrl : PurchaseResponse {sale, payment}
+Ctrl --> UI : PurchaseResponse
+
+UI -> Ctrl : POST /payments/initiate {sale_id, método}
+Ctrl -> Model : payment_service.pay(db, sale, method)
+Model --> Ctrl : gateway_reference (pasarela simulada) + PaymentRead
+Ctrl --> UI : gateway_reference
+
+Cli -> UI : Confirma el pago en la pasarela
+UI -> Ctrl : POST /payments/confirm
+Ctrl -> Model : payment_service.confirm(db)
+Model -> Model : sale COMPLETED, inventario consumido, comprobante generado
+Model --> Ctrl : PaymentRead (COMPLETED) + ReceiptRead
+Ctrl --> UI : Confirmación de compra con comprobante
+
+@enduml

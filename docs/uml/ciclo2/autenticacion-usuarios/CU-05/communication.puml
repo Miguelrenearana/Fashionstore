@@ -1,0 +1,28 @@
+@startuml CU-05
+actor "Cliente" as Cli
+boundary "«UI» Angular (registro / perfil)" as UI
+control "«Controller» API /auth, /clients" as Ctrl
+entity "«Model» AuthService / ClientService / User" as Model
+
+Cli -> UI : 1: registrarse
+UI -> Ctrl : 2: POST /auth/register
+Ctrl -> Model : 3: register_client(db, data)
+Model --> Ctrl : 4: ClientProfileRead
+Ctrl --> UI : 5: TokenResponse (JWT)
+UI --> Cli : 6: sesión iniciada
+
+Cli -> UI : 7: consultar perfil
+UI -> Ctrl : 8: GET /clients/me
+Ctrl -> Model : 9: get_client(db, user_id)
+Model --> Ctrl : 10: ClientProfileRead
+Ctrl --> UI : 11: ClientProfileRead
+UI --> Cli : 12: perfil mostrado
+
+Cli -> UI : 13: editar perfil
+UI -> Ctrl : 14: PATCH /clients/me
+Ctrl -> Model : 15: update_client(db, user_id, data)
+Model --> Ctrl : 16: ClientProfileRead
+Ctrl --> UI : 17: ClientProfileRead
+UI --> Cli : 18: perfil actualizado
+
+@enduml

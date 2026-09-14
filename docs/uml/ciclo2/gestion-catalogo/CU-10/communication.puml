@@ -1,0 +1,28 @@
+@startuml CU-10
+actor "Administrador / Gestor de catálogo" as Adm
+boundary "«UI» Angular (admin)" as UI
+control "«Controller» API /suppliers" as Ctrl
+entity "«Model» SupplierService / Supplier" as Model
+
+Adm -> UI : 1: consultar proveedores
+UI -> Ctrl : 2: GET /suppliers
+Ctrl -> Model : 3: list_suppliers(db)
+Model --> Ctrl : 4: list[SupplierRead]
+Ctrl --> UI : 5: list[SupplierRead]
+UI --> Adm : 6: proveedores mostrados
+
+Adm -> UI : 7: registrar proveedor
+UI -> Ctrl : 8: POST /suppliers
+Ctrl -> Model : 9: create_supplier(db, data)
+Model --> Ctrl : 10: SupplierRead
+Ctrl --> UI : 11: SupplierRead
+UI --> Adm : 12: proveedor registrado
+
+Adm -> UI : 13: editar proveedor
+UI -> Ctrl : 14: PATCH /suppliers/{id}
+Ctrl -> Model : 15: update_supplier(db, id, data)
+Model --> Ctrl : 16: SupplierRead
+Ctrl --> UI : 17: proveedor actualizado
+UI --> Adm : 18: confirmación
+
+@enduml

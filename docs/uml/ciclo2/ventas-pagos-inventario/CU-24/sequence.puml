@@ -1,0 +1,21 @@
+@startuml CU-24
+actor "Cajero / Encargado de sucursal" as Csh
+boundary "«UI» Angular (POS)" as UI
+control "«Controller» API /payments, /sales" as Ctrl
+entity "«Model» PaymentService / ReceiptService / Sale / Payment / Receipt" as Model
+
+Csh -> UI : Confirma el cobro de la venta
+UI -> Ctrl : POST /payments/confirm
+Ctrl -> Model : payment_service.confirm(db)
+Model -> Model : sale COMPLETED; genera comprobante (factura CUF-…)
+Model --> Ctrl : PaymentRead (COMPLETED) + ReceiptRead
+Ctrl --> UI : PaymentRead + ReceiptRead
+
+Csh -> UI : Muestra o descarga el comprobante
+UI -> Ctrl : GET /sales/{id}/receipt
+Ctrl -> Model : receipt_service.get_for_sale(db, sale)
+Model --> Ctrl : ReceiptRead (document_url)
+Ctrl --> UI : ReceiptRead
+UI --> Csh : Impresión/descarga del comprobante
+
+@enduml

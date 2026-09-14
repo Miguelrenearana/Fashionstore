@@ -1,0 +1,29 @@
+@startuml CU-03
+actor "Cliente" as Cli
+boundary "«UI» Angular (auth)" as UI
+control "«Controller» API /auth" as Ctrl
+entity "«Model» AuthService / PasswordReset / Notification" as Model
+
+Cli -> UI : Solicita recuperar su contraseña
+UI -> Ctrl : POST /auth/forgot-password {email}
+Ctrl -> Model : request_password_reset(db, email)
+Model -> Model : genera token (30 min) y guarda hash en password_reset
+Model -> Model : notify(db, user) "email mock" con el token
+Model --> Ctrl : mensaje genérico (no revela si existe el correo)
+Ctrl --> UI : Message "Si el correo existe, recibirás un token"
+
+Cli -> UI : Envía el token recibido y la nueva contraseña
+UI -> Ctrl : POST /auth/reset-password {token, password}
+Ctrl -> Model : reset_password(db, token, password)
+Model -> Model : valida hash, expiración y uso; actualiza password_hash
+Model --> Ctrl : Message "Contraseña actualizada"
+Ctrl --> UI : Message
+
+Cli -> UI : Inicia sesión con la nueva contraseña
+UI -> Ctrl : POST /auth/login
+Ctrl -> Model : authenticate(db, email, password)
+Model --> Ctrl : TokenResponse (JWT)
+Ctrl --> UI : TokenResponse
+UI --> Cli : Sesión iniciada
+
+@enduml

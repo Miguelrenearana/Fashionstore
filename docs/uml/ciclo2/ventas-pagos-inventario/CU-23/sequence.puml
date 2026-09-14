@@ -1,0 +1,20 @@
+@startuml CU-23
+actor "Cajero / Encargado de sucursal" as Csh
+boundary "«UI» Angular (POS)" as UI
+control "«Controller» API /sales" as Ctrl
+entity "«Model» SalesService / Sale / Inventory" as Model
+
+Csh -> UI : Registra una venta presencial
+UI -> Ctrl : POST /sales {items, sucursal, cliente?}
+Ctrl -> Model : create_sale(db, data) → Sale PENDING
+Model --> Ctrl : SaleRead
+Ctrl --> UI : SaleRead
+UI --> Csh : Venta registrada (listo para cobrar)
+
+Csh -> UI : La venta se cobra en caja (vínculo con CU-24)
+UI -> Ctrl : POST /payments/initiate {sale_id, method: cash}
+Ctrl -> Model : payment_service.pay(db, sale, cash)
+Model --> Ctrl : gateway_reference + PaymentRead
+Ctrl --> UI : pasar al flujo de caja (CU-24)
+
+@enduml

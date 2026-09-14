@@ -1,0 +1,28 @@
+@startuml CU-03
+actor "Cliente" as Cli
+boundary "«UI» Angular (auth)" as UI
+control "«Controller» API /auth" as Ctrl
+entity "«Model» AuthService / PasswordReset / Notification" as Model
+
+Cli -> UI : 1: solicitar recuperación
+UI -> Ctrl : 2: POST /auth/forgot-password {email}
+Ctrl -> Model : 3: request_password_reset(db, email)
+Model --> Ctrl : 4: mensaje genérico
+Ctrl --> UI : 5: token enviado por correo (mock)
+UI --> Cli : 6: "revisa tu bandeja (o notificaciones)"
+
+Cli -> UI : 7: envía token + nueva contraseña
+UI -> Ctrl : 8: POST /auth/reset-password {token, password}
+Ctrl -> Model : 9: reset_password(db, token, password)
+Model --> Ctrl : 10: contraseña actualizada
+Ctrl --> UI : 11: Message
+UI --> Cli : 12: confirmación
+
+Cli -> UI : 13: inicia sesión
+UI -> Ctrl : 14: POST /auth/login
+Ctrl -> Model : 15: authenticate(db, email, password)
+Model --> Ctrl : 16: TokenResponse (JWT)
+Ctrl --> UI : 17: TokenResponse
+UI --> Cli : 18: sesión iniciada
+
+@enduml

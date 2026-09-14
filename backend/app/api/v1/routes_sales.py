@@ -5,7 +5,9 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.reservation import Reservation
 from app.models.sales import Sale
 from app.models.user import Client, Employee
+from app.schemas.receipt import ReceiptRead
 from app.schemas.sale import SaleGenerate, SaleRead
+from app.services.receipt_service import receipt_service
 from app.services.sales_service import sales_service
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -41,6 +43,18 @@ def get_sale(db: DbSession, sale_id: int, current: CurrentUser):
     if not _can_view_sale(db, sale, current):
         raise ForbiddenError("You cannot view this sale.")
     return sale
+
+
+@router.get("/{sale_id}/receipt", response_model=ReceiptRead)
+def get_receipt(db: DbSession, sale_id: int, current: CurrentUser):
+    """CU-24: retrieve the issued comprobante (invoice) of a sale."""
+    sale = sales_service.get(db, sale_id)
+    if not _can_view_sale(db, sale, current):
+        raise ForbiddenError("You cannot view this sale.")
+    receipt = receipt_service.get_for_sale(db, sale_id)
+    if not receipt:
+        raise NotFoundError("No comprobante issued for this sale yet (pay first).")
+    return receipt
 
 
 @router.get("", response_model=list[SaleRead])

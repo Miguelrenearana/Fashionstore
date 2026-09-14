@@ -9,6 +9,7 @@ from app.models.sales import Payment, Sale, SalePaymentStatus, SaleStatus
 from app.payments.domain.service import PaymentService
 from app.payments.factory import get_payment_service
 from app.schemas.payment import PaymentConfirm, PaymentRead
+from app.services.receipt_service import receipt_service
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -63,6 +64,7 @@ def confirm_payment(
             if status_result.status == SalePaymentStatus.COMPLETED:
                 payment.sale.status = SaleStatus.PAID
                 payment.sale.paid_at = datetime.now(UTC)
+                receipt_service.generate(db, payment.sale)
             elif status_result.status == SalePaymentStatus.DECLINED:
                 payment.sale.status = SaleStatus.CANCELLED
         db.commit()
@@ -81,5 +83,7 @@ def refund_payment(
         payment.status = result.status
         if payment.sale:
             payment.sale.status = SaleStatus.REFUNDED
+            if result.status == SalePaymentStatus.REFUNDED:
+                receipt_service.generate(db, payment.sale, receipt_type="credit_note")
         db.commit()
     return {"reference": gateway_reference, "status": result.status}

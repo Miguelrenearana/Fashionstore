@@ -148,6 +148,49 @@ interface Branch {
         </form>
       </div>
     </section>
+
+    <h3>Productos (CU-07)</h3>
+    <form class="card" (ngSubmit)="createProduct()">
+      <h4>Nueva prenda</h4>
+      <select [(ngModel)]="newProduct.category_id" name="prod_cat" required>
+        <option [ngValue]="0" disabled>Categoría...</option>
+        @for (c of categories; track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+      <input [(ngModel)]="newProduct.name" name="prod_name" placeholder="Nombre de la prenda" required />
+      <input [(ngModel)]="newProduct.base_price" name="prod_price" type="number" step="0.01" min="0" required />
+      <label class="chip">
+        <input type="checkbox" [(ngModel)]="newProduct.is_ar_enabled" name="prod_ar" />
+        AR habilitado
+      </label>
+      <button type="submit" [disabled]="loading">Agregar</button>
+    </form>
+    <section class="card" >
+      <h4>Listado de prendas ({{ products.length }})</h4>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Precio base</th><th>AR</th><th>Activo</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (p of products; track p.id) {
+            <tr>
+              <td>{{ p.id }}</td>
+              <td><input [(ngModel)]="p.name" name="p_name_{{ p.id }}" placeholder="Nombre" /></td>
+              <td>{{ p.category_name || p.category?.name || '-' }}</td>
+              <td><input [(ngModel)]="p.base_price" name="p_price_{{ p.id }}" type="number" step="0.01" /></td>
+              <td>{{ p.is_ar_enabled ? 'Sí' : 'No' }}</td>
+              <td>{{ p.is_active ? 'Sí' : 'No' }}</td>
+              <td class="inline">
+                <button (click)="saveProduct(p)" [disabled]="loading">Guardar</button>
+                <button (click)="toggleProductActive(p)" [disabled]="loading">Activar/Desactivar</button>
+                <button class="danger" (click)="deleteProduct(p.id)" [disabled]="loading">Eliminar</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
   `,
   styles: [
     `
@@ -264,6 +307,7 @@ export class AdminComponent implements OnInit {
     this.loadRoles();
     this.loadBranches();
     this.loadOptions();
+    this.loadProducts();
   }
 
   private headers(): Record<string, string> {
@@ -444,5 +488,89 @@ export class AdminComponent implements OnInit {
       this.create('/suppliers', { ...this.newSupplier });
       this.newSupplier = { company_name: '', contact_name: '', email: '' };
     }
+  }
+
+  // ─── Productos (CU-07) ────────────────────────────────────
+  products: any[] = [];
+  loadingProducts = false;
+  newProduct = {
+    category_id: 1,
+    name: '',
+    base_price: 0,
+    is_ar_enabled: false,
+  };
+
+  loadProducts(): void {
+    this.loadingProducts = true;
+    this.json('/products')
+      .then((data) => (this.products = data))
+      .catch((e) => (this.error = `No se pudieron cargar productos: ${e}`))
+      .finally(() => (this.loadingProducts = false));
+  }
+
+  createProduct(): void {
+    if (!this.newProduct.name.trim() || !this.newProduct.base_price) return;
+    this.loading = true;
+    const payload = { ...this.newProduct };
+    this.api('/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => {
+        if (!r.ok) return r.json().then((b: { detail?: string }) => Promise.reject(b.detail ?? r.statusText));
+      })
+      .then(() => {
+        this.newProduct = { category_id: 1, name: '', base_price: 0, is_ar_enabled: false };
+        this.loadProducts();
+      })
+      .catch((e) => (this.error = `No se pudo crear el producto: ${e}`))
+      .finally(() => (this.loading = false));
+  }
+
+  saveProduct(p: any): void {
+    this.loading = true;
+    this.api(`/products/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: p.name,
+        base_price: p.base_price,
+        is_ar_enabled: p.is_ar_enabled,
+      }),
+    })
+      .then((r) => {
+        if (!r.ok) return r.json().then((b: { detail?: string }) => Promise.reject(b.detail ?? r.statusText));
+      })
+      .then(() => this.loadProducts())
+      .catch((e) => (this.error = `No se pudo guardar: ${e}`))
+      .finally(() => (this.loading = false));
+  }
+
+  toggleProductActive(p: any): void {
+    this.loading = true;
+    this.api(`/products/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !p.is_active }),
+    })
+      .then((r) => {
+        if (!r.ok) return r.json().then((b: { detail?: string }) => Promise.reject(b.detail ?? r.statusText));
+      })
+      .then(() => this.loadProducts())
+      .catch((e) => (this.error = `No se pudo cambiar el estado: ${e}`))
+      .finally(() => (this.loading = false));
+  }
+
+  deleteProduct(id: number): void {
+    if (!confirm('¿Desactivar esta prenda? (soft delete)')) return;
+    this.loading = true;
+    this.api(`/products/${id}`, { method: 'DELETE' })
+      .then((r) => {
+        if (!r.ok) return r.json().then((b: { detail?: string }) => Promise.reject(b.detail ?? r.statusText));
+      })
+      .then(() => this.loadProducts())
+      .catch((e) => (this.error = `No se pudo desactivar: ${e}`))
+      .finally(() => (this.loading = false));
   }
 }

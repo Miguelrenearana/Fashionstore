@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.catalog import Category, Collection, Color, Garment, GarmentVariant, Size
-from app.schemas.product import GarmentCreate
+from app.schemas.product import GarmentCreate, GarmentUpdate
 
 
 class ProductService:
@@ -36,6 +36,30 @@ class ProductService:
         if not garment:
             raise NotFoundError("Garment not found.")
         return garment
+
+    def update(self, db: Session, garment_id: int, payload: GarmentUpdate) -> Garment:
+        garment = self.get(db, garment_id)
+        if payload.category_id is not None and not db.get(Category, payload.category_id):
+            raise NotFoundError("Category not found.")
+        if (
+            payload.collection_id is not None
+            and payload.collection_id != 0
+            and not db.get(Collection, payload.collection_id)
+        ):
+            raise NotFoundError("Collection not found.")
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(garment, field, value)
+        db.commit()
+        db.refresh(garment)
+        return garment
+
+    def delete(self, db: Session, garment_id: int) -> None:
+        garment = self.get(db, garment_id)
+        for variant in garment.variations:
+            if variant.inventory and variant.inventory.reserved_quantity > 0:
+                raise ValidationError("Cannot deactivate garment with reserved stock.")
+        garment.is_active = False
+        db.commit()
 
     def _make_variant(self, db: Session, garment: Garment, v) -> GarmentVariant:
         size = db.get(Size, v.size_id) if v.size_id else None

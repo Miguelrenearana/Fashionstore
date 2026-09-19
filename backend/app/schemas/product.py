@@ -39,3 +39,13 @@ class VariantRead(ORMModel):
     price: float
     size_id: int | None
     color_id: int | None
+
+
+class GarmentUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2)
+    description: str | None = None
+    base_price: float | None = Field(default=None, gt=0)
+    is_ar_enabled: bool | None = None
+    category_id: int | None = None
+    collection_id: int | None = None
+    is_active: bool | None = None

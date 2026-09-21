@@ -1,11 +1,12 @@
 import { Component, signal, HostListener } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
+import { NotificationsComponent } from './notifications.component';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, NotificationsComponent],
   template: `
     <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
 
@@ -30,6 +31,9 @@ import { AuthService } from '@core/auth/auth.service';
           @if (!auth.isAuthenticated()) {
             <a routerLink="/auth" routerLinkActive="active" class="btn btn-ghost nav-link">Iniciar sesión</a>
           } @else {
+            @if (auth.isAuthenticated()) {
+              <app-notifications />
+            }
             <span class="roles">{{ auth.roles().join(' · ') || 'Usuario' }}</span>
             <button (click)="logout()" class="btn btn-outline btn-sm" style="--color-primary: var(--color-text-on-nav); --color-border-focus: var(--color-text-on-nav); border-color: currentColor; color: var(--color-text-on-nav);">Salir</button>
           }
@@ -63,6 +67,9 @@ import { AuthService } from '@core/auth/auth.service';
             @if (auth.isAuthenticated() && auth.hasAnyRole('BRANCH_MANAGER', 'CASHIER', 'ADMIN', 'MANAGER')) {
               <li><a routerLink="/staff" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Reservas</a></li>
               <li><a routerLink="/pos" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Punto de venta</a></li>
+            }
+            @if (auth.isAuthenticated()) {
+              <li><a routerLink="/notifications" class="mobile-nav-link" (click)="closeMobileMenu()">Notificaciones</a></li>
             }
           </ul>
           <div class="mobile-nav-footer">

@@ -106,6 +106,17 @@ class ApiClient {
     }
   }
 
+  /// GET that returns a top-level JSON list.
+  Future<List<dynamic>> getList(String path,
+      {Map<String, dynamic>? queryParameters}) async {
+    try {
+      final res = await dio.get(path, queryParameters: queryParameters);
+      return res.data as List<dynamic>;
+    } on DioException catch (e) {
+      throw _parseError(e);
+    }
+  }
+
   Future<Map<String, dynamic>> post(String path,
       {Object? data, Map<String, dynamic>? queryParameters}) async {
     try {

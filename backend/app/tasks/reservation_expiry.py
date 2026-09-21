@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from sqlalchemy import or_
 
 from app.core.database import SessionLocal
-from app.models.analytics import Notification, NotificationType
 from app.models.reservation import Reservation, ReservationHistory, ReservationStatus
+from app.services.notification_service import notification_service
 
 RESERVATION_LIFETIME_MINUTES = 30
 
@@ -34,13 +34,12 @@ def expire_reservations() -> int:
             )
             client = reservation.client
             if client and client.user_id:
-                db.add(
-                    Notification(
-                        user_id=client.user_id,
-                        type=NotificationType.RESERVATION,
-                        title="Reserva expirada",
-                        body=f"Tu reserva {reservation.pickup_code} expiró por tiempo límite.",
-                    )
+                notification_service.notify(
+                    db=db,
+                    user_id=client.user_id,
+                    type="RESERVATION",
+                    title="Reserva expirada",
+                    body=f"Tu reserva {reservation.pickup_code} expiró por tiempo límite.",
                 )
             expired += 1
         db.commit()

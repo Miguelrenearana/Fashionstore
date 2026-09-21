@@ -4,9 +4,9 @@ Revision ID: 62fce272acff
 Revises: 0002_ci2_extra
 Create Date: 2026-09-19 19:32:42.269223
 """
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = '62fce272acff'
 down_revision = '0002_ci2_extra'
@@ -28,15 +28,12 @@ def upgrade() -> None:
     op.add_column('pago', sa.Column('qr_verification_method', sa.String(length=20), nullable=True))
     op.add_column('pago', sa.Column('qr_manually_marked_paid', sa.Boolean(), nullable=True))
     op.add_column('pago', sa.Column('qr_webhook_payload', sa.String(), nullable=True))
-    op.drop_index('ix_password_reset_token_hash', table_name='password_reset')
     op.alter_column('prenda_variante', 'size_id',
                existing_type=sa.INTEGER(),
                nullable=False)
     op.alter_column('prenda_variante', 'color_id',
                existing_type=sa.INTEGER(),
                nullable=False)
-    op.drop_index('ix_product_embeddings_vector', table_name='product_embeddings', postgresql_with={'lists': '100'}, postgresql_using='ivfflat')
-    op.drop_constraint('uq_product_embeddings_variant_id', 'product_embeddings', type_='unique')
     op.alter_column('recepcion_producto', 'employee_id',
                existing_type=sa.INTEGER(),
                nullable=False)
@@ -60,15 +57,12 @@ def downgrade() -> None:
     op.alter_column('recepcion_producto', 'employee_id',
                existing_type=sa.INTEGER(),
                nullable=True)
-    op.create_unique_constraint('uq_product_embeddings_variant_id', 'product_embeddings', ['variant_id'])
-    op.create_index('ix_product_embeddings_vector', 'product_embeddings', ['embedding'], unique=False, postgresql_with={'lists': '100'}, postgresql_using='ivfflat')
     op.alter_column('prenda_variante', 'color_id',
                existing_type=sa.INTEGER(),
                nullable=True)
     op.alter_column('prenda_variante', 'size_id',
                existing_type=sa.INTEGER(),
                nullable=True)
-    op.create_index('ix_password_reset_token_hash', 'password_reset', ['token_hash'], unique=True)
     op.drop_column('pago', 'qr_webhook_payload')
     op.drop_column('pago', 'qr_manually_marked_paid')
     op.drop_column('pago', 'qr_verification_method')
@@ -82,3 +76,4 @@ def downgrade() -> None:
                existing_type=sa.VARCHAR(length=80),
                nullable=True)
     # ### end Alembic commands ###
+

@@ -1,9 +1,15 @@
 import { Routes } from '@angular/router';
 import { AuthGuard, NegAuthGuard, RoleGuard } from '@core/guards/auth.guard';
 import { LandingComponent } from './features/landing/landing.component';
+import { NotificationsPageComponent } from './shared/ui/notifications-page.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: LandingComponent },
+  {
+    path: 'notifications',
+    component: NotificationsPageComponent,
+    canActivate: [AuthGuard],
+  },
   {
     path: 'auth',
     loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),

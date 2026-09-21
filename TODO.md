@@ -25,17 +25,11 @@ Formato:
 
 - [x] Generar **migración Alembic inicial** (todas las tablas) + `scripts/init_extensions.sql`.
 - [x] **AR móvil mejorado 21/09/2026**: los placeholders del probador se sustituyeron por **prendas PNG transparentes reales** en `mobile/assets/images/garments/` (camiseta, playera, hoodie, vestido, chaqueta, blusa — generadas por script PIL). `GarmentOverlayPainter` ahora hace **anclaje automático** al cuadrilátero hombros→caderas del `PoseService` (con `ui.Image` y `canvas` warp), `ArFittingScreen` incluye selector de prendas (chips). Analyze + 8 tests en verde, `flutter build apk --release` regenerado ✓ (APK 21/09/2026 16:22). Sin ajuste manual (decisión del dueño: solo anclaje automático).
-- [ ] **Email real**: actualmente **log/consola**; conectar SendGrid/Mailgun (RULES §8).
-- [ ] **CU-03 end-to-end (UX):** el token de reset se entrega por email **mock** (tabla
-  `Notification` + `[email-mock]` en el log del backend). El backend ya expone
-  `GET /notifications` y `PATCH /{id}/read` (`routes_notifications.py`), pero la web **no
-  tiene UI de notificaciones**. Opciones: (a) sección "Mis notificaciones" en la web
-  (aparecería el token), o (b) email real. Sin esto CU-03 no se completa solo desde el
-  navegador.
+- [x] **Email real — HECHO 21/09/2026 (Gmail SMTP)**: `notification_service.notify()` envía email real con `smtplib` (STARTTLS 587) cuando `settings.smtp_password` existe; `reservation_expiry` e `inventory_sync` pasan por él. **Pendiente del dueño:** App Password de Gmail de `sonclargod@gmail.com` → `SMTP_USER`/`SMTP_PASSWORD`/`MAIL_FROM` en `backend/.env` y vars de Render (`render.yaml` ya declara `SMTP_HOST/PORT/USER/PASSWORD/MAIL_FROM` con `sync:false`).
+- [x] **CU-03 end-to-end — HECHO 21/09/2026**: UI de notificaciones en **web** (`NotificationsComponent` campana + badge en navbar, página `/notifications` con `GET/PATCH`) **y móvil** (`notifications_screen.dart` conectado a `GET /notifications` + `PATCH /:id/read` + marcar todas). Con la App Password configurada el token de reset llega por email real.
 - [ ] **Prueba manual de la web** en navegador (PC): registrar/perfil, carrito + compra, POS + factura, catálogo/admin, reservas.
 - [x] **App móvil (CU-19):** **APK Android compilado** (`mobile/build/app/outputs/flutter-apk/app-release.apk`, 94.4 MB, 21/09/2026) con `flutter build apk --release` (se regeneró la carpeta `android/` que faltaba). Siendo directivas del dueño, se quitaron el catálogo público, carrito, checkout, perfil y reservas de la **web** (movidos a la app Flutter); la web queda como **Admin/Staff/POS/Landing SEO** (Fase 7, `ng build` OK). Deep links `fashionstore://fitting/:variantId` conectados (Fase 8) y **AR con prendas reales liberado 21/09/2026** (assets + anclaje automático por pose + selector). **Pendiente:** probar en **dispositivo físico con cámara** (CU-19 AR) y los deep links.
-- [ ] **BD demo limpia:** re-ejecutar `alembic upgrade head` + seed antes de una demo (los
-  tests dejaron ventas/comprobantes/resets extra en Neon; no rompen, pero ensucian).
+- [x] **BD demo limpia — HECHO 21/09/2026**: Neon re-creada (`DROP SCHEMA public CASCADE` + `CREATE SCHEMA public` + `alembic upgrade head` + `python -m scripts.seed`). Seed extendido e idempotente: 6 usuarios demo (incluye **cliente real `sonclargod@gmail.com` / `Client123!`**), CASHIER con Employee, 2 sucursales (La Paz + Santa Cruz), 10 prendas con variantes/inventario en ambas, promoción "Primera reserva -10%", 3 reservas demo (PENDING/PREPARED/IN_TRIAL), 1 venta PAID con detalle+pago+comprobante. Verificado login de los 6 roles + rutas (`catalog`, `categories`, `notifications`, `sales`, `users`, `reservations`). **87/87 tests backend en verde** (con BD limpia). Bonus: corregida la migración `62fce272acff` que borraba la constraint `uq_product_embeddings_variant_id` y el índice ivfflat (rompía `ON CONFLICT`; 2 tests de recommendations ahora pasan).
 - [ ] **Exportar diagramas:** **no se hará** (omitido).
 
 ## 🟢 Backlog

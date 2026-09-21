@@ -153,7 +153,7 @@ class NotificationItem {
       body: json['body'] as String,
       createdAt:
           DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
-      read: json['read'] as bool? ?? false,
+      read: json['is_read'] as bool? ?? json['read'] as bool? ?? false,
       type: json['type'] as String?,
       deepLink: json['deep_link'] as String?,
     );

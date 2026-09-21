@@ -1,10 +1,10 @@
 import logging
 
 from app.core.database import SessionLocal
-from app.models.analytics import Notification, NotificationType
 from app.models.inventory import Inventory
 from app.models.movement import InventoryMovement, InventoryMovementType
 from app.models.user import Branch, Employee
+from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +46,12 @@ def sync_inventory() -> int:
             if stock:
                 for employee in db.query(Employee).filter(Employee.branch_id == branch.id):
                     if employee.user_id:
-                        db.add(
-                            Notification(
-                                user_id=employee.user_id,
-                                type=NotificationType.STOCK,
-                                title="Stock bajo",
-                                body=f"{stock} productos bajo stock en {branch.name}.",
-                            )
+                        notification_service.notify(
+                            db=db,
+                            user_id=employee.user_id,
+                            type="STOCK",
+                            title="Stock bajo",
+                            body=f"{stock} productos bajo stock en {branch.name}.",
                         )
         db.commit()
         return applied

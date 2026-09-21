@@ -1,9 +1,9 @@
 # Plan Completo: Flutter App Completa + Web Admin (Opción B)
 
-**Estado actual:** Fases 0-8 completas + APK compilado (21/09/2026). `flutter analyze` y `flutter test` (5 tests) en verde. Angular reducido a solo-web (admin/staff/POS/landing) con PWA. CI/CD en GitHub Actions.
-**Última tarea completada:** AR del probador virtual liberado (21/09/2026): prendas PNG transparentes reales en `mobile/assets/images/garments/` (camiseta, playera, hoodie, vestido, chaqueta, blusa, generadas por script PIL), `GarmentOverlayPainter` con **anclaje automático** al cuadrilátero hombros→caderas de `PoseService`, `ui.Image` + warp en canvas, selector de prendas por chips en `ArFittingScreen` (carga con `instantiateImageCodec`). Sin ajuste manual (decisión del dueño). `flutter analyze` sin issues + 8 tests en verde; `flutter build apk --release` regenerado ✓ (APK 21/09/2026 16:22, 94.3 MB).
+**Estado actual:** Fases 0-8 completas + APK compilado (21/09/2026). `flutter analyze` y `flutter test` (8 tests) en verde. Angular reducido a solo-web (admin/staff/POS/landing) con PWA. CI/CD en GitHub Actions.
+**Última tarea completada (21/09/2026):** Técnicos finales: **email real via Gmail SMTP** (App Password, `notification_service` con `smtplib` STARTTLS, `render.yaml` con vars SMTP), **UI de notificaciones** en web (`NotificationsComponent` campana + página `/notifications`, navbar) y móvil (`notifications_screen.dart` conectado a `GET/PATCH /notifications`), y **BD demo sembrada desde cero** con el seed extendido: 6 roles (incluye cliente real `sonclargod@gmail.com` / `Client123!`), CASHIER con Employee, 2 sucursales (La Paz + Santa Cruz), 10 prendas con variantes/inventario en ambas, promoción, 3 reservas demo y 1 venta PAID con pago/comprobante. BD Neon re-creada (`DROP SCHEMA public CASCADE` + `alembic upgrade head` + seed) y verificado login de los 6 usuarios + rutas. Backend: **87/87 tests verdes**; móvil: `flutter analyze` sin issues + 8 tests; web: `ng build` OK. Se corrigió además el bug de la migración `62fce272acff` que borraba la constraint única de `product_embeddings.variant_id` y el índice ivfflat (rompía `ON CONFLICT`).
 
-**Próxima tarea:** Probar el APK en dispositivo físico (CU-19 cámara/AR y deep links), confirmar redeploy Vercel del commit `f2074f5` y atender los técnicos 🟡 (email real, UI notificaciones CU-03, BD demo limpia, marcas Fase 1-6 del plan).
+**Próxima tarea:** Probar el APK en dispositivo físico (CU-19 cámara/AR y deep links) y confirmar redeploy Vercel. Pendiente del dueño: **App Password de Gmail** de `sonclargod@gmail.com` para activar el envío real (configurar `SMTP_USER`/`SMTP_PASSWORD`/`MAIL_FROM` en `backend/.env` y Render).
 ---
 
 ## Resumen del Proyecto
@@ -25,22 +25,20 @@
 
 ## Fases del Plan
 
-### ✅ FASE 0: Design System Unificado (COMPLETADA PARCIALMENTE)
+### ✅ FASE 0: Design System Unificado (COMPLETADA)
 
 **Completado:**
 - [x] `design-tokens.json` en raíz del proyecto
 - [x] `mobile/lib/app.dart` actualizado con nuevo color scheme (#FF8C00)
 - [x] `mobile/lib/core/design/design_tokens.dart` con todas las clases (AppColors, AppSpacing, AppRadius, AppShadows, AppTypography, AppBreakpoints, AppZIndex)
-
-**Pendiente Fase 0:**
-- [ ] `mobile/lib/core/design/app_theme.dart` - ThemeData light/dark completo usando design tokens
-- [ ] `mobile/lib/core/design/app_text_theme.dart` - TextTheme con GoogleFonts (Inter + Geist)
-- [ ] `mobile/lib/core/design/app_color_scheme.dart` - ColorScheme light/dark
-- [ ] Verificar `frontend/src/styles/design-system.css` consistencia con JSON
+- [x] `mobile/lib/core/design/app_theme.dart` - ThemeData light/dark completo usando design tokens
+- [x] `mobile/lib/core/design/app_text_theme.dart` - TextTheme con GoogleFonts (Inter + Geist)
+- [x] `mobile/lib/core/design/app_color_scheme.dart` - ColorScheme light/dark
+- [x] Verificar `frontend/src/styles/design-system.css` consistencia con JSON
 
 ---
 
-### 🔄 FASE 1: Flutter Shared UI Library (4-5 días)
+### ✅ FASE 1: Flutter Shared UI Library (4-5 días) (COMPLETADA)
 
 **Ubicación:** `mobile/lib/shared/widgets/`
 
@@ -71,7 +69,7 @@
 
 ---
 
-### 🔄 FASE 2: Flutter Navigation + Auth (2-3 días)
+### ✅ FASE 2: Flutter Navigation + Auth (2-3 días) (COMPLETADA)
 
 **Routing:** `mobile/lib/core/routing/app_router.dart`
 - Configurar go_router con todas las rutas
@@ -112,7 +110,7 @@ GoRoute(path: '/pos', builder: POSScreen),
 
 ---
 
-### 🔄 FASE 3: Flutter Catálogo + Detalle + AR (4-5 días)
+### ✅ FASE 3: Flutter Catálogo + Detalle + AR (4-5 días) (COMPLETADA 21/09/2026)
 
 **Estructura:** `mobile/lib/features/catalog/`
 
@@ -135,7 +133,7 @@ GoRoute(path: '/pos', builder: POSScreen),
 
 ---
 
-### 🔄 FASE 4: Flutter Carrito + Checkout + Pagos (4-5 días)
+### ✅ FASE 4: Flutter Carrito + Checkout + Pagos (4-5 días) (COMPLETADA)
 
 **Estructura:** `mobile/lib/features/cart/`
 
@@ -150,7 +148,10 @@ GoRoute(path: '/pos', builder: POSScreen),
 
 ---
 
-### 🔄 FASE 5: Flutter Reservas + Perfil + Notificaciones (3-4 días)
+### ✅ FASE 5: Flutter Reservas + Perfil + Notificaciones (3-4 días) (COMPLETADA 21/09/2026)
+
+**Notas de cierre Fase 5:**
+- Notificaciones: `notifications_screen.dart` conectado a `GET /notifications?limit=` + `PATCH /notifications/:id/read` + marcar todas (via `ApiClient.getList/patch`); badge/campana en navbar web (`NotificationsComponent`) + página `/notifications` (web). `flutter analyze` sin issues + tests en verde.
 
 **Estructura:** `mobile/lib/features/reservations/`, `mobile/lib/features/profile/`
 
@@ -164,7 +165,7 @@ GoRoute(path: '/pos', builder: POSScreen),
 
 ---
 
-### 🔄 FASE 6: Flutter IA Features (2-3 días)
+### ✅ FASE 6: Flutter IA Features (2-3 días) (COMPLETADA)
 
 | Archivo | CU | Ruta |
 |---------|-----|------|
@@ -286,11 +287,13 @@ cd mobile && flutter test
 1. **Design tokens:** Ya existe `design-tokens.json` en raíz y `design_tokens.dart` en Flutter. Úsalos como única fuente de verdad.
 2. **Stitch references:** Todos los mockups están en `stitch_fashionstore_design_system_redesign/` con `code.html` y `screen.png` por pantalla.
 3. **CU-19 (AR):** Implementado y completo en `mobile/lib/features/ar_fitting/` (pantalla + `PoseService` + `GarmentOverlayPainter` con anclaje automático por hombros/caderas, prendas PNG en `assets/images/garments/`, selector de prendas, consume `/catalog/:id/ar-config`). NO lleva ajuste manual (decisión del dueño).
-4. **Backend:** Verificar endpoints antes de bloquear features Flutter.
-5. **Distribución CU:** Respeta estrictamente la tabla de distribución - no dupliques funcionalidad entre plataformas.
-5. **Shared UI:** Crea componentes genéricos y reutilizables, no pantallas completas en shared.
+4. **Email real:** `notification_service.notify()` envía email real via Gmail SMTP (`smtplib`, STARTTLS/587) solo si `settings.smtp_password` está configurado; si no, loguea `[email-mock]`. Falta la App Password de Gmail del dueño para `SMTP_USER=sonclargod@gmail.com` (`SMTP_PASSWORD`, `MAIL_FROM` en `backend/.env` + vars de Render declaradas en `render.yaml`).
+5. **BD demo:** `backend/scripts/seed.py` idempotente. Cliente demo con email real: `sonclargod@gmail.com` / `Client123!`. También existe `client@fashionstore.dev`/`Client123!` (usado por fixtures de tests). 6 usuarios, 2 sucursales, 10 prendas, promoción, 3 reservas demo, 1 venta PAID. La constraint única `uq_product_embeddings_variant_id` y el índice ivfflat fueron restaurados en la migración `62fce272acff` (bug de autogeneración).
+6. **Backend:** Verificar endpoints antes de bloquear features Flutter.
+7. **Distribución CU:** Respeta estrictamente la tabla de distribución - no dupliques funcionalidad entre plataformas.
+8. **Shared UI:** Crea componentes genéricos y reutilizables, no pantallas completas en shared.
 
 ---
 
-**Última actualización:** $(date)
-**Estado:** Listo para Fase 0 completación → Fase 1
+**Última actualización:** 21/09/2026
+**Estado:** ✅ Fases 0-8 completas. Pendiente: probar APK en dispositivo físico + redeploy Vercel + App Password de Gmail.

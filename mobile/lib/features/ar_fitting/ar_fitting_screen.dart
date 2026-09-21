@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +12,8 @@ import 'garment_overlay_painter.dart';
 import 'pose_detector.dart';
 
 /// Virtual fitting room (CU-19): real camera preview + MediaPipe pose
-/// landmarks (shoulders/hips) + a draggable/scalable 2D garment overlay.
+/// landmarks (shoulders/hips) + the selected garment auto-anchored to the
+/// detected torso.
 class ArFittingScreen extends ConsumerStatefulWidget {
   const ArFittingScreen({super.key, required this.variantId});
 
@@ -26,12 +28,20 @@ class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
   CameraController? _controller;
   bool _cameraReady = false;
   bool _poseMode = true;
-  bool _overlayVisible = true;
   bool _detecting = false;
+
+  final _garmentAssets = <String, String>{
+    'camiseta': 'assets/images/garments/camiseta.png',
+    'playera': 'assets/images/garments/playera.png',
+    'hoodie': 'assets/images/garments/hoodie.png',
+    'vestido': 'assets/images/garments/vestido.png',
+    'chaqueta': 'assets/images/garments/chaqueta.png',
+    'blusa': 'assets/images/garments/blusa.png',
+  };
+  final Map<String, ui.Image> _loadedGarments = {};
+  String _selectedGarment = 'camiseta';
   String _garmentName = '';
-  List<Offset> _landmarks = const [];
-  Offset _overlayOffset = Offset.zero;
-  double _overlayScale = 1.0;
+  DetectedPose _pose = const DetectedPose();
   String _status = 'Inicializando cámara…';
 
   @override
@@ -39,6 +49,23 @@ class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
     super.initState();
     _initCamera();
     _loadArConfig();
+    _loadGarmentImages();
+  }
+
+  Future<void> _loadGarmentImages() async {
+    for (final entry in _garmentAssets.entries) {
+      try {
+        final data = await DefaultAssetBundle.of(context).load(entry.value);
+        final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+        final frame = await codec.getNextFrame();
+        _loadedGarments[entry.key] = frame.image;
+      } catch (_) {
+        // Keep the garment unavailable if its asset cannot be decoded.
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadArConfig() async {
@@ -76,7 +103,7 @@ class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
       setState(() {
         _controller = controller;
         _cameraReady = true;
-        _status = 'Cámara lista. Mueve la prenda para ajustarla.';
+        _status = 'Cámara lista. Colócate frente a la cámara.';
       });
       await controller.startImageStream(_onFrame);
     } catch (e) {
@@ -102,15 +129,18 @@ class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
         bytes: _concatPlanes(image.planes),
         metadata: metadata,
       );
-      final landmarks = await _poseService.detectLandmarks(input);
+      final pose = await _poseService.detectTorso(
+        input,
+        frameSize: Size(image.width.toDouble(), image.height.toDouble()),
+      );
       if (!mounted) {
         return;
       }
       setState(() {
-        _landmarks = [
-          for (final lm in landmarks)
-            Offset(lm.x / image.width, lm.y / image.height),
-        ];
+        _pose = pose;
+        _status = pose.hasTorso
+            ? 'Prenda anclada. Muévete para verla caer.'
+            : 'No se detectó el torso completo.';
       });
     } catch (_) {
       // Ignore detection errors on a frame (stream keeps going).
@@ -120,74 +150,79 @@ class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
   }
 
   Uint8List _concatPlanes(List<Plane> planes) {
-    final buffer = BytesBuilder();
+    final builder = BytesBuilder();
     for (final plane in planes) {
-      buffer.add(plane.bytes);
+      builder.add(plane.bytes);
     }
-    return buffer.toBytes();
+    return builder.toBytes();
   }
 
   @override
   void dispose() {
     _controller?.stopImageStream();
     _controller?.dispose();
+    for (final image in _loadedGarments.values) {
+      image.dispose();
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final camera = _controller;
+    final garmentImage = _loadedGarments[_selectedGarment];
     return Scaffold(
       appBar: AppBar(title: const Text('Probador virtual')),
       body: Column(
         children: [
           Expanded(
-            child: GestureDetector(
-              onScaleStart: (d) => _overlayOffset = _overlayOffset,
-              onScaleUpdate: (d) {
-                setState(() {
-                  _overlayScale = (_overlayScale * d.scale).clamp(0.4, 3.0);
-                  _overlayOffset += d.focalPointDelta;
-                });
-              },
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (_cameraReady && camera != null)
-                    CameraPreview(camera)
-                  else
-                    const _CameraPlaceholder(),
-                  if (_overlayVisible)
-                    CustomPaint(
-                      painter: GarmentOverlayPainter(
-                        placeholderSrc: 'assets/images/placeholders/hoodie_front.png',
-                        label: _garmentName.isNotEmpty
-                            ? _garmentName
-                            : 'Variante #${widget.variantId}',
-                        offset: _overlayOffset,
-                        scale: _overlayScale,
-                        landmarks: _landmarks,
-                      ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (_cameraReady && camera != null)
+                  CameraPreview(camera)
+                else
+                  const _CameraPlaceholder(),
+                if (garmentImage != null)
+                  CustomPaint(
+                    painter: GarmentOverlayPainter(
+                      garmentImage: garmentImage,
+                      landmarks: _pose.landmarks,
+                      poseConfidence: _pose.confidence,
                     ),
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Chip(label: Text(_status)),
                   ),
-                ],
-              ),
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Chip(
+                    label: Text(
+                      _garmentName.isNotEmpty
+                          ? '$_garmentName · $_selectedGarment'
+                          : _selectedGarment,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           _ControlsBar(
             poseMode: _poseMode,
-            overlayVisible: _overlayVisible,
             onTogglePose: (v) => setState(() => _poseMode = v),
-            onToggleOverlay: (v) => setState(() => _overlayVisible = v),
-            onReset: () => setState(() {
-              _overlayOffset = Offset.zero;
-              _overlayScale = 1.0;
-            }),
             onSnap: () => _showSnapMessage(),
+          ),
+          _GarmentPicker(
+            garments: _garmentAssets.keys.toList(),
+            selected: _selectedGarment,
+            loaded: _loadedGarments,
+            onSelected: (name) => setState(() => _selectedGarment = name),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              _status,
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
@@ -204,18 +239,12 @@ class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
 class _ControlsBar extends StatelessWidget {
   const _ControlsBar({
     required this.poseMode,
-    required this.overlayVisible,
     required this.onTogglePose,
-    required this.onToggleOverlay,
-    required this.onReset,
     required this.onSnap,
   });
 
   final bool poseMode;
-  final bool overlayVisible;
   final ValueChanged<bool> onTogglePose;
-  final ValueChanged<bool> onToggleOverlay;
-  final VoidCallback onReset;
   final VoidCallback onSnap;
 
   @override
@@ -223,49 +252,129 @@ class _ControlsBar extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                FilterChip(
-                  label: const Text('Detectar pose'),
-                  selected: poseMode,
-                  onSelected: onTogglePose,
-                ),
-                FilterChip(
-                  label: const Text('Mostrar prenda'),
-                  selected: overlayVisible,
-                  onSelected: onToggleOverlay,
-                ),
-              ],
+            FilterChip(
+              label: const Text('Detectar pose'),
+              selected: poseMode,
+              onSelected: onTogglePose,
             ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton.icon(
-                  onPressed: onReset,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Reajustar'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: onSnap,
-                  icon: const Icon(Icons.photo_camera),
-                  label: const Text('Capturar'),
-                ),
-              ],
-            ),
-            const Text(
-              'Arrastra para mover la prenda, pellizca para escalarla.',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ElevatedButton.icon(
+              onPressed: onSnap,
+              icon: const Icon(Icons.photo_camera),
+              label: const Text('Capturar'),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _GarmentPicker extends StatelessWidget {
+  const _GarmentPicker({
+    required this.garments,
+    required this.selected,
+    required this.loaded,
+    required this.onSelected,
+  });
+
+  final List<String> garments;
+  final String selected;
+  final Map<String, ui.Image> loaded;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 76,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: garments.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final name = garments[index];
+          final image = loaded[name];
+          final isSelected = name == selected;
+          return InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => onSelected(name),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 64,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (image != null)
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CustomPaint(
+                        painter: _ThumbPainter(image),
+                      ),
+                    )
+                  else
+                    const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Icon(Icons.checkroom, size: 28),
+                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    name,
+                    style: const TextStyle(fontSize: 10),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ThumbPainter extends CustomPainter {
+  _ThumbPainter(this.image);
+
+  final ui.Image image;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final src = Rect.fromLTWH(
+      0,
+      0,
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
+    canvas.drawImageRect(
+      image,
+      src,
+      Offset.zero & size,
+      Paint()
+        ..isAntiAlias = true
+        ..filterQuality = FilterQuality.low,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThumbPainter oldDelegate) =>
+      oldDelegate.image != image;
 }
 
 class _CameraPlaceholder extends StatelessWidget {

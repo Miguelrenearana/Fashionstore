@@ -1,9 +1,9 @@
 # Plan Completo: Flutter App Completa + Web Admin (Opción B)
 
 **Estado actual:** Fases 0-8 completas + APK compilado (21/09/2026). `flutter analyze` y `flutter test` (5 tests) en verde. Angular reducido a solo-web (admin/staff/POS/landing) con PWA. CI/CD en GitHub Actions.
-**Última tarea completada:** Fase 8 (Integración + Deploy): deep link `fashionstore://fitting/:variantId` (intent-filter Android + enlace en landing web), endpoint `GET /api/v1/catalog/:id/ar-config` (consumido por ArFittingScreen), Angular PWA (`ng add @angular/pwa` + manifest con paleta), `.github/workflows/ci.yml` (backend+frontend+mobile). FCM/Firebase omitido (sin credenciales) y Play Store cancelado (solo APK side-loading, decisión del dueño). `flutter build apk --release` regenerado ✓.
-**Próxima tarea:** Redeploy a Vercel (commit + push a GitHub, auto-deploy) y probar el APK en dispositivo físico (CU-19 cámara y deep links).
+**Última tarea completada:** AR del probador virtual liberado (21/09/2026): prendas PNG transparentes reales en `mobile/assets/images/garments/` (camiseta, playera, hoodie, vestido, chaqueta, blusa, generadas por script PIL), `GarmentOverlayPainter` con **anclaje automático** al cuadrilátero hombros→caderas de `PoseService`, `ui.Image` + warp en canvas, selector de prendas por chips en `ArFittingScreen` (carga con `instantiateImageCodec`). Sin ajuste manual (decisión del dueño). `flutter analyze` sin issues + 8 tests en verde; `flutter build apk --release` regenerado ✓ (APK 21/09/2026 16:22, 94.3 MB).
 
+**Próxima tarea:** Probar el APK en dispositivo físico (CU-19 cámara/AR y deep links), confirmar redeploy Vercel del commit `f2074f5` y atender los técnicos 🟡 (email real, UI notificaciones CU-03, BD demo limpia, marcas Fase 1-6 del plan).
 ---
 
 ## Resumen del Proyecto
@@ -127,8 +127,11 @@ GoRoute(path: '/pos', builder: POSScreen),
 
 **AR (Ya implementado - CU-19):**
 - `features/ar_fitting/ar_fitting_screen.dart` ✅ EXISTE
-- Agregar: Deep link back to web (`launchUrl('https://web/cart?add=$variantId')`)
-- Agregar: Fetch AR config desde backend (`GET /catalog/:id/ar-config`)
+- `features/ar_fitting/pose_detector.dart` ✅ EXISTE (MediaPipe Pose → `DetectedPose` hombros/caderas)
+- `features/ar_fitting/garment_overlay_painter.dart` ✅ REESCRITO 21/09/2026: anclaje **automático** al cuadrilátero hombro izq→der→cadera der→izq
+- ✅ Agregado: Fetch AR config desde backend (`GET /catalog/:id/ar-config`) — hecho 21/09/2026
+- ✅ Reemplazados placeholders por prendas reales: `mobile/assets/images/garments/*.png` (camiseta, playera, hoodie, vestido, chaqueta, blusa) generadas como PNG transparentes (PIL, alpha). Selector de prenda por chips en `ArFittingScreen` (`_GarmentPicker`) y carga con `instantiateImageCodec`.
+- Deep link back a web **N/A**: la web se redujo a Admin/Staff/POS/Landing (Fase 7); se usa enlace web→app `fashionstore://fitting/1` en el landing. **SIN** ajuste manual (pinch/arrastre) — decisión del dueño: solo anclaje automático.
 
 ---
 
@@ -209,7 +212,7 @@ GoRoute(path: '/pos', builder: POSScreen),
 | Deep links bidireccionales | `fashionstore://fitting/123` → apertura del probador virtual | ✅ **HECHO 21/09/2026**: intent-filter `fashionstore://fitting` en `AndroidManifest.xml` (acción VIEW, BROWSABLE); la ruta `/fitting/{variantId}` ya existe en GoRouter (`ArFittingRoutes`). Lado web: botón "Abrir probador virtual en la app" (`class="btn btn-outline"`) en el landing con `href="fashionstore://fitting/1"`. Nota: el `https://web/cart?add=123` dejó de existir porque la web se redujo a Admin/Staff/POS/Landing en Fase 7; se reemplazó por el enlace web→app. |
 | Push notifications | FCM (Flutter) + VAPID (Web) | ⏭️ **OMITIDO** (sin proyecto Firebase/`google-services.json`; no se publica en Play Store). Documentar en `TODO.md`. |
 | AR Config endpoint | `GET /api/v1/catalog/:id/ar-config` en backend | ✅ **HECHO 21/09/2026**: creado `ArConfigRead`/`ArVariantRead` en `backend/app/schemas/catalog.py`, `catalog_service.get_ar_config()` y ruta en `routes_catalog.py`. Consumido por `ArFittingScreen` (`_loadArConfig()`): muestra el nombre real de la prenda en el overlay. `ruff` + import OK. |
-| Build APK/AAB | `flutter build apk --release` / `flutter build appbundle` | ✅ **HECHO 21/09/2026** (y REGENERADO tras deep links/AR ✓): `app-release.apk` (94.4 MB) en `mobile/build/app/outputs/flutter-apk/`. NDK 28.2.13676358; fixes en `android/gradle.properties` (`kotlin.incremental=false`, `kotlin.compiler.execution.strategy=in-process`) y `android/build.gradle.kts` (`compileOnly androidx.concurrent:concurrent-futures:1.2.0`). `flutter analyze` sin issues + 5 tests en verde. |
+| Build APK/AAB | `flutter build apk --release` / `flutter build appbundle` | ✅ **HECHO 21/09/2026** (REGENERADO tras AR real ✓, APK 16:22, 94.3 MB): `app-release.apk` en `mobile/build/app/outputs/flutter-apk/`. NDK 28.2.13676358; fixes en `android/gradle.properties` (`kotlin.incremental=false`, `kotlin.compiler.execution.strategy=in-process`) y `android/build.gradle.kts` (`compileOnly androidx.concurrent:concurrent-futures:1.2.0`). `flutter analyze` sin issues + **8 tests en verde** (incluye 3 de `garment_overlay_painter_test.dart`). |
 | Play Store | Screenshots, metadata, release tracks | ⏭️ **CANCELADO** por decisión del dueño (solo APK para el celular, no se publica). |
 | Angular PWA | `ng add @angular/pwa` para Admin | ✅ **HECHO 21/09/2026**: `ng add @angular/pwa@18.2.21` (ngsw-config.json, `public/manifest.webmanifest`, iconos 72‑512px). Se ajustó: manifest con paleta `#FF8C00`/`#FFF3E0` y nombre "FashionStore"; `theme-color` duplicado eliminado de `index.html`; `angular.json` assets incluyen `public/manifest.webmanifest` + `public/icons/*` (el builder `application` de Angular 18 no copió `public/` solo). `ng build --configuration production` OK, `ngsw.json` generado en `dist`. |
 | CI/CD | GitHub Actions para ambos | ✅ **HECHO 21/09/2026**: `.github/workflows/ci.yml` con 3 jobs: backend (ruff + pytest con servicio Postgres pgvector/pg16), frontend (`npm ci` + `ng build`), mobile (`flutter analyze` + `flutter test`). |
@@ -223,7 +226,7 @@ GoRoute(path: '/pos', builder: POSScreen),
 | `GET /catalog?page=&size=&search=&category_id=` | CU-12,13 | Verificar |
 | `GET /catalog/categories` | CU-13 | Verificar |
 | `GET /catalog/:id` | CU-12,19 | Verificar |
-| `GET /catalog/:id/ar-config` | CU-19 | **NUEVO - Crear** |
+| `GET /catalog/:id/ar-config` | CU-19 | ✅ **HECHO 21/09/2026** |
 | `POST /auth/login` | CU-01 | Verificar |
 | `POST /auth/register` | CU-01 | Verificar |
 | `POST /auth/forgot-password` | CU-03 | Verificar |
@@ -282,7 +285,7 @@ cd mobile && flutter test
 
 1. **Design tokens:** Ya existe `design-tokens.json` en raíz y `design_tokens.dart` en Flutter. Úsalos como única fuente de verdad.
 2. **Stitch references:** Todos los mockups están en `stitch_fashionstore_design_system_redesign/` con `code.html` y `screen.png` por pantalla.
-3. **CU-19 (AR):** Ya implementado en `mobile/lib/features/ar_fitting/ar_fitting_screen.dart`. Solo necesita deep link back y config endpoint.
+3. **CU-19 (AR):** Implementado y completo en `mobile/lib/features/ar_fitting/` (pantalla + `PoseService` + `GarmentOverlayPainter` con anclaje automático por hombros/caderas, prendas PNG en `assets/images/garments/`, selector de prendas, consume `/catalog/:id/ar-config`). NO lleva ajuste manual (decisión del dueño).
 4. **Backend:** Verificar endpoints antes de bloquear features Flutter.
 5. **Distribución CU:** Respeta estrictamente la tabla de distribución - no dupliques funcionalidad entre plataformas.
 5. **Shared UI:** Crea componentes genéricos y reutilizables, no pantallas completas en shared.

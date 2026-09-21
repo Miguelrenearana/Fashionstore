@@ -19,13 +19,12 @@ Formato:
 - [x] **GitHub**: repo subido y sincronizado (origin/main).
 - [ ] **Firebase**: **no requerido** (se omite). FCM preferido, pero sin proyecto Firebase/`google-services.json` (no se publica en Play Store) no se integra el push real (Fase 8: OMITIDO).
 - [ ] **PagosNet (sandbox)**: **no requerido** (se usa gateway QR estático mock; se habilita solo si lo pide el dueño).
-- [x] **Fase 8 (Integración + Deploy)** completada 21/09/2026: deep link `fashionstore://fitting/:variantId` (intent-filter Android + enlace web→app en el landing), endpoint `GET /api/v1/catalog/:id/ar-config` (nuevo, consumido por `ArFittingScreen`), Angular PWA (`ng add @angular/pwa`, manifest con paleta, `ngsw.json`), CI/CD `.github/workflows/ci.yml` (backend ruff+pytest con Postgres pgvector, frontend build, mobile analyze+test). Play Store cancelado (solo APK side-loading, decisión del dueño). `flutter build apk --release` regenerado ✓. Pendiente: push a repo → redeploy Vercel.
+- [x] **Fase 8 (Integración + Deploy)** completada 21/09/2026: deep link `fashionstore://fitting/:variantId` (intent-filter Android + enlace web→app en el landing), endpoint `GET /api/v1/catalog/:id/ar-config` (nuevo, consumido por `ArFittingScreen`), Angular PWA (`ng add @angular/pwa`, manifest con paleta, `ngsw.json`), CI/CD `.github/workflows/ci.yml` (backend ruff+pytest con Postgres pgvector, frontend build, mobile analyze+test). Play Store cancelado (solo APK side-loading, decisión del dueño). Commit + push a GitHub hecho 21/09/2026 (`f2074f5`) → **redeploy Vercel** (pendiente de confirmar).
 
 ## 🟡 Técnicos (pendientes reales)
 
 - [x] Generar **migración Alembic inicial** (todas las tablas) + `scripts/init_extensions.sql`.
-- [ ] **AR móvil**: hoy se usan **placeholders PNG** en `mobile/assets/images/placeholders/`; sustituir
-  por assets reales cuando existan.
+- [x] **AR móvil mejorado 21/09/2026**: los placeholders del probador se sustituyeron por **prendas PNG transparentes reales** en `mobile/assets/images/garments/` (camiseta, playera, hoodie, vestido, chaqueta, blusa — generadas por script PIL). `GarmentOverlayPainter` ahora hace **anclaje automático** al cuadrilátero hombros→caderas del `PoseService` (con `ui.Image` y `canvas` warp), `ArFittingScreen` incluye selector de prendas (chips). Analyze + 8 tests en verde, `flutter build apk --release` regenerado ✓ (APK 21/09/2026 16:22). Sin ajuste manual (decisión del dueño: solo anclaje automático).
 - [ ] **Email real**: actualmente **log/consola**; conectar SendGrid/Mailgun (RULES §8).
 - [ ] **CU-03 end-to-end (UX):** el token de reset se entrega por email **mock** (tabla
   `Notification` + `[email-mock]` en el log del backend). El backend ya expone
@@ -34,7 +33,7 @@ Formato:
   (aparecería el token), o (b) email real. Sin esto CU-03 no se completa solo desde el
   navegador.
 - [ ] **Prueba manual de la web** en navegador (PC): registrar/perfil, carrito + compra, POS + factura, catálogo/admin, reservas.
-- [x] **App móvil (CU-19):** **APK Android compilado** (`mobile/build/app/outputs/flutter-apk/app-release.apk`, 94.4 MB, 21/09/2026) con `flutter build apk --release` (se regeneró la carpeta `android/` que faltaba). Siendo directivas del dueño, se quitaron el catálogo público, carrito, checkout, perfil y reservas de la **web** (movidos a la app Flutter); la web queda como **Admin/Staff/POS/Landing SEO** (Fase 7, `ng build` OK). Deep links `fashionstore://fitting/:variantId` conectados (Fase 8). **Pendiente:** probar en **dispositivo físico con cámara** (CU-19 AR) y los deep links.
+- [x] **App móvil (CU-19):** **APK Android compilado** (`mobile/build/app/outputs/flutter-apk/app-release.apk`, 94.4 MB, 21/09/2026) con `flutter build apk --release` (se regeneró la carpeta `android/` que faltaba). Siendo directivas del dueño, se quitaron el catálogo público, carrito, checkout, perfil y reservas de la **web** (movidos a la app Flutter); la web queda como **Admin/Staff/POS/Landing SEO** (Fase 7, `ng build` OK). Deep links `fashionstore://fitting/:variantId` conectados (Fase 8) y **AR con prendas reales liberado 21/09/2026** (assets + anclaje automático por pose + selector). **Pendiente:** probar en **dispositivo físico con cámara** (CU-19 AR) y los deep links.
 - [ ] **BD demo limpia:** re-ejecutar `alembic upgrade head` + seed antes de una demo (los
   tests dejaron ventas/comprobantes/resets extra en Neon; no rompen, pero ensucian).
 - [ ] **Exportar diagramas:** **no se hará** (omitido).
@@ -99,7 +98,8 @@ Formato:
 
 > Nota: diagramas y tablas usan la **numeración oficial** del proyecto. El email real
 > (SendGrid/Mailgun) y la UX de CU-03 quedan anotados en 🟡 Técnicos. El warp 2D guiado
-> por pose con assets reales del probador AR queda para Ciclo 3 (congelado).
+> por pose con assets reales del probador AR **fue implementado 21/09/2026** (assets PNG en
+> `mobile/assets/images/garments/` + `GarmentOverlayPainter` con anclaje automático).
 
 ### Ciclo 3 (completado — tag `v3.0.0-ciclo3`)
 

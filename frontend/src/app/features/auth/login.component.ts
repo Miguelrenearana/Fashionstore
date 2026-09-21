@@ -9,57 +9,39 @@ import { AuthService } from '@core/auth/auth.service';
   imports: [FormsModule],
   template: `
     <section class="login">
-      <h2>Iniciar sesiÃ³n</h2>
+      <h2>Iniciar sesión</h2>
       <form (ngSubmit)="onSubmit()">
-        <input
-          type="email"
-          name="email"
-          [(ngModel)]="email"
-          placeholder="usuario@fashionstore.dev"
-          required
-        />
-        <input
-          type="password"
-          name="password"
-          [(ngModel)]="password"
-          placeholder="ContraseÃ±a"
-          required
-        />
-        <button type="submit">Entrar</button>
+        <div class="form-field">
+          <label class="form-label" for="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            [(ngModel)]="email"
+            placeholder="usuario@fashionstore.dev"
+            required
+          />
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="password">Contraseña</label>
+          <input
+            id="password"
+            type="password"
+            [(ngModel)]="password"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Entrar</button>
+        <p class="text-center text-sm mt-4">
+          <a routerLink="/auth/forgot-password" class="text-primary hover:underline">¿Olvidé mi contraseña?</a>
+        </p>
       </form>
-      <p>
-        <a routerLink="/auth/forgot-password">Olvidé mi contraseña</a>
-      </p>
       @if (error) {
-        <p class="error">{{ error }}</p>
+        <p class="form-error mt-3">{{ error }}</p>
       }
     </section>
   `,
-  styles: [
-    `
-      .login {
-        max-width: 360px;
-        margin: 3rem auto;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-      input,
-      button {
-        padding: 0.625rem;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-      }
-      button {
-        background: var(--color-primary);
-        color: #fff;
-        border: none;
-      }
-      .error {
-        color: #b00020;
-      }
-    `,
-  ],
+  styles: []
 })
 export class LoginComponent {
   email = '';

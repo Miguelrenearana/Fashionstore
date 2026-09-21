@@ -21,10 +21,10 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        sync: false
+        value: sonclargod@gmail.com
       - key: SMTP_PASSWORD
         sync: false
       - key: MAIL_FROM
-        sync: false
+        value: sonclargod@gmail.com
     healthCheckPath: /health
     dockerfilePath: ./backend/Dockerfile

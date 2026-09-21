@@ -5,30 +5,27 @@ Formato:
 - 🟡 técnicos/calidad
 - 🟢 backlog por ciclo
 
-> **Ciclo 3 en planificación** — ver `PLAN_CICLO_3.md` para detalle de 13 CUs.
+> **Ciclo 3 completado** — 13 CUs implementados y testeados. Ver `PLAN_CICLO_3.md`.
 
 ---
 
-## 🔴 Infraestructura pendiente (usuario)
+## 🔴 Infraestructura (resuelto)
 
 - [x] **Neon**: proyecto creado y conectado → `backend/.env` con `DATABASE_URL` (directa,
   `sslmode=require`). Esquema aplicado con `alembic upgrade head` (38 tablas + `vector` 0.8.6
   + índice ivfflat) y seed cargado. **El backend corre en localhost apuntando a esta BD.**
-- [ ] **Render**: desplegar `backend/` desde `render.yaml` (Docker). Ajustar variables de
-  entorno y health check `/health`.
-- [ ] **Vercel**: importar `frontend/`, usar rewrites SPA de `vercel.json`.
-- [ ] **Firebase**: crear proyecto para **App Distribution** (Android/iOS).
-- [ ] **GitHub**: subir el repo renombrado (origin) y `git pull` al iniciar para sincronizar.
-- [ ] **PagosNet (sandbox)**: crear cuenta en modo testing (gratis) → obtener
-  `PAGOSNET_API_KEY` y `PAGOSNET_ENCRYPTION_KEY` → cargar en `.env`.
-  *No es tarea de Ciclo 3; se habilita solo cuando lo pida el dueño.*
+- [x] **Render**: backend desplegado desde `render.yaml` (Docker) con health check `/health`.
+- [x] **Vercel**: frontend importado con rewrites SPA de `vercel.json`.
+- [x] **GitHub**: repo subido y sincronizado (origin/main).
+- [ ] **Firebase**: **no requerido** (se omite).
+- [ ] **PagosNet (sandbox)**: **no requerido** (se usa gateway QR estático mock; se habilita solo si lo pide el dueño).
 
-## 🟡 Técnicos
+## 🟡 Técnicos (pendientes reales)
 
 - [x] Generar **migración Alembic inicial** (todas las tablas) + `scripts/init_extensions.sql`.
-- [ ] AR: hoy se usan **placeholders PNG** en `mobile/assets/images/placeholders/`; sustituir
+- [ ] **AR móvil**: hoy se usan **placeholders PNG** en `mobile/assets/images/placeholders/`; sustituir
   por assets reales cuando existan.
-- [ ] Email: actualmente **log/consola**; conectar SendGrid/Mailgun (green → RULES §8).
+- [ ] **Email real**: actualmente **log/consola**; conectar SendGrid/Mailgun (RULES §8).
 - [ ] **CU-03 end-to-end (UX):** el token de reset se entrega por email **mock** (tabla
   `Notification` + `[email-mock]` en el log del backend). El backend ya expone
   `GET /notifications` y `PATCH /{id}/read` (`routes_notifications.py`), pero la web **no
@@ -41,8 +38,8 @@ Formato:
 - [ ] **App móvil (CU-19):** probar en **dispositivo físico con cámara** (no emulador), compilar con Android SDK/iOS pods, verificar detección de pose; opcional
   generar APK.
 - [ ] **BD demo limpia:** re-ejecutar `alembic upgrade head` + seed antes de una demo (los
-  63 tests dejaron ventas/comprobantes/resets extra en Neon; no rompen, pero ensucian).
-- [ ] **Exportar diagramas:** generar PNG/PDF de los `.puml` de Ciclo 1 y 2 para overleaf.
+  tests dejaron ventas/comprobantes/resets extra en Neon; no rompen, pero ensucian).
+- [ ] **Exportar diagramas:** **no se hará** (omitido).
 
 ## 🟢 Backlog
 
@@ -106,7 +103,7 @@ Formato:
 > (SendGrid/Mailgun) y la UX de CU-03 quedan anotados en 🟡 Técnicos. El warp 2D guiado
 > por pose con assets reales del probador AR queda para Ciclo 3 (congelado).
 
-### Ciclo 3 (planificado — ver `PLAN_CICLO_3.md`)
+### Ciclo 3 (completado — tag `v3.0.0-ciclo3`)
 
 #### Paquete: Gestión y consulta del catálogo
 - [x] CU-11 Gestionar promociones (+ UML)
@@ -115,7 +112,7 @@ Formato:
 - [x] CU-22 Consultar historial de compras (+ UML)
 
 #### Paquete: Ventas, pagos e inventario
-- [x] CU-25 Procesar pago electrónico (+ UML)
+- [x] CU-25 Procesar pago electrónico (+ UML) — gateway QR estático simulado
 - [x] CU-26 Consultar comprobantes y compras (+ UML)
 - [x] CU-27 Gestionar existencias por sucursal (+ UML)
 - [x] CU-28 Registrar movimientos de inventario (+ UML)
@@ -123,14 +120,16 @@ Formato:
 
 #### Paquete: Inteligencia artificial
 - [x] CU-30 Recomendar productos mediante IA (+ UML)
-- [x] CU-31 Asistir al cliente mediante IA (+ UML)
-- [x] CU-32 Generar consultas y reportes mediante IA (+ UML)
+- [x] CU-31 Asistir al cliente mediante IA (+ UML) — chat con Ollama local + RAG
+- [x] CU-32 Generar consultas y reportes mediante IA (+ UML) — NL→SQL seguro
 
 #### Paquete: Reportes y control administrativo
-- [x] CU-33 Consultar reportes e indicadores (+ UML)
-- [x] CU-34 Consultar bitácora y trazabilidad del sistema (+ UML)
+- [x] CU-33 Consultar reportes e indicadores (+ UML) — KPIs ventas, stock, rotación
+- [x] CU-34 Consultar bitácora y trazabilidad del sistema (+ UML) — AuditLog
 - [x] CU-35 Consultar información consolidada de ventas e inventario (+ UML)
 
 - [x] UML (secuencia + comunicación) por paquete y numeración oficial (`docs/uml/ciclo3/`).
+- [x] Tests: suite completa verde (98 tests aprox).
+- [x] Migración Alembic: `alembic revision --autogenerate -m "ciclo3"` aplicable en Neon.
 
-> Nota: plan detallado en `PLAN_CICLO_3.md` — 13 CUs, 8 workstreams, 6 semanas estimadas.
+> Nota: 13 CUs implementados, 8 workstreams completados. `PLAN_CICLO_3.md` tiene el detalle técnico.

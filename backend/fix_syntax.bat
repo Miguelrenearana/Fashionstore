@@ -1,0 +1,4 @@
+@echo off
+cd /d "D:\Proyectos si 2\EXAMEN 1 SI2\Plataforma-inteligente_-tienda-de-ropa\backend"
+"D:\Proyectos si 2\EXAMEN 1 SI2\Plataforma-inteligente_-tienda-de-ropa\backend\.venv\Scripts\python.exe" -c "with open('app/services/report_service.py', 'r') as f: content = f.read(); content = content.replace('query = self.db.query(Sale).filter(\n            Sale.paid_at >= start_date,\n            Sale.paid_at <= end_date,\n            Sale.status == SaleStatus.PAID,\n        }\n        }\n        if branch_id:', 'query = self.db.query(Sale).filter(\n            Sale.paid_at >= start_date,\n            Sale.paid_at <= end_date,\n            Sale.status == SaleStatus.PAID,\n        )\n        if branch_id:'); print('Fixed')"
+pause

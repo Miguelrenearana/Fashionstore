@@ -1,0 +1,21 @@
+@startuml CU-32
+actor "Administrador" as Admin
+boundary "«UI» Angular (Admin/Reportes)" as UI
+control "«Controller» API /ai/reports" as Ctrl
+entity "«Model» AIService / Ollama (codellama)" as Model
+database "«DB» PostgreSQL (ventas, inventario, etc.)" as DB
+
+Admin -> UI : Escribe prompt en lenguaje natural
+UI -> Ctrl : POST /api/v1/ai/reports/generate {prompt, max_rows}
+Ctrl -> Model : generate_sql_query(prompt, max_rows)
+Model -> Model : Construir prompt con esquema de BD + reglas
+Model -> Model : Ollama.generate(codellama, prompt)
+Model -> Model : _extract_sql(response)
+Model -> Model : _validate_sql(sql, allowed_tables)
+Model -> DB : conn.execute(sql)
+DB --> Model : columns, rows
+Model --> Ctrl : {columns, rows, row_count, sql, exec_time}
+Ctrl --> UI : AIReportResponse
+UI --> Admin : Tabla de resultados + SQL generado (opcional)
+
+@enduml

@@ -1,0 +1,32 @@
+@startuml CU-22
+actor "Cliente" as Cli
+boundary "«UI» Angular (Perfil/Historial)" as UI
+control "«Controller» API /history" as Ctrl
+entity "«Model» HistoryService / Sale, Reservation, Receipt" as Model
+
+Cli -> UI : Accede a "Mis compras" / Historial
+UI -> Ctrl : GET /api/v1/history?page=1&size=20
+Ctrl -> Model : get_client_history(db, client_id, page, size)
+Model -> Model : _get_client_sales(db, client_id)
+Model -> Model : _get_client_reservations(db, client_id)
+Model -> Model : Combina y ordena por fecha desc
+Model -> Model : Paginación
+Model --> Ctrl : PurchaseHistoryResponse {items, total, page, size, pages}
+Ctrl --> UI : PurchaseHistoryResponse
+UI --> Cli : Lista unificada (ventas + reservas) paginada
+
+Cli -> UI : Click en una venta
+UI -> Ctrl : GET /api/v1/sales/{id} (opcional)
+Ctrl -> Model : get(db, sale_id) con detalles
+Model --> Ctrl : Sale con detalles y comprobante
+Ctrl --> UI : Sale con detalles y comprobante
+UI --> Cli : Detalle de venta + comprobante
+
+Cli -> UI : Click en una reserva
+UI -> Ctrl : GET /api/v1/reservations/{id} (opcional)
+Ctrl -> Model : get(db, reservation_id)
+Model --> Ctrl : Reservation con detalles
+Ctrl --> UI : Reservation con detalles
+UI --> Cli : Detalle de reserva + código de retiro
+
+@enduml

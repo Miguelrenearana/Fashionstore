@@ -29,10 +29,15 @@ class ReservationService:
         )
         total = 0
         for item in payload.items:
-            inventory = db.query(Inventory).filter(
-                Inventory.branch_id == payload.branch_id,
-                Inventory.variant_id == item.variant_id,
-            ).first()
+            inventory = (
+                db.query(Inventory)
+                .filter(
+                    Inventory.branch_id == payload.branch_id,
+                    Inventory.variant_id == item.variant_id,
+                )
+                .order_by(Inventory.id)
+                .first()
+            )
             if not inventory or inventory.available < item.quantity:
                 raise ValidationError(f"Insufficient stock for variant {item.variant_id}.")
             inventory.reserved_quantity += item.quantity
@@ -101,10 +106,15 @@ class ReservationService:
 
     def _release_stock(self, db: Session, reservation: Reservation) -> None:
         for detail in reservation.details:
-            inventory = db.query(Inventory).filter(
-                Inventory.branch_id == reservation.branch_id,
-                Inventory.variant_id == detail.variant_id,
-            ).first()
+            inventory = (
+                db.query(Inventory)
+                .filter(
+                    Inventory.branch_id == reservation.branch_id,
+                    Inventory.variant_id == detail.variant_id,
+                )
+                .order_by(Inventory.id)
+                .first()
+            )
             if inventory:
                 inventory.reserved_quantity = max(0, inventory.reserved_quantity - detail.quantity)
 

@@ -1,0 +1,41 @@
+@startuml CU-11
+actor "Administrador" as Admin
+boundary "«UI» Angular (Admin Panel)" as UI
+control "«Controller» API /promotions" as Ctrl
+entity "«Model» PromotionService / Promotion, PromotionGarment" as Model
+
+Admin -> UI : 1: Accede a gestión de promociones
+UI -> Ctrl : 2: GET /api/v1/promotions
+Ctrl -> Model : 3: list(db, page, size, active_only, search)
+Model --> Ctrl : 4: Page[PromotionRead]
+Ctrl --> UI : 5: Page[PromotionRead]
+UI --> Admin : 6: Lista paginada de promociones
+
+Admin -> UI : 1: Crea nueva promoción
+UI -> Ctrl : 2: POST /api/v1/promotions {name, discount_percent, start_at, end_at, garment_ids}
+Ctrl -> Model : 3: create(db, name, discount_percent, start_at, end_at, garment_ids)
+Model -> Model : 4: Valida fechas (start_at < end_at)
+Model -> Model : 5: Verifica prendas existen y están activas
+Model -> Model : 6: Crea Promotion + PromotionGarment[]
+Model --> Ctrl : 7: PromotionRead
+Ctrl --> UI : 8: PromotionRead
+UI --> Admin : 9: Promoción creada exitosamente
+
+Admin -> UI : 1: Actualiza promoción
+UI -> Ctrl : 2: PATCH /api/v1/promotions/{id} {discount_percent, garment_ids}
+Ctrl -> Model : 3: update(db, id, **kwargs)
+Model -> Model : 4: Valida fechas si cambian
+Model -> Model : 5: Si garment_ids cambia, reemplaza asociaciones
+Model --> Ctrl : 6: PromotionRead
+Ctrl --> UI : 7: PromotionRead
+UI --> Admin : 8: Promoción actualizada
+
+Admin -> UI : 1: Elimina promoción (soft delete)
+UI -> Ctrl : 2: DELETE /api/v1/promotions/{id}
+Ctrl -> Model : 3: delete(db, id)
+Model -> Model : 4: Soft delete (is_deleted = True)
+Model --> Ctrl : 4: {message: "Promoción eliminada"}
+Ctrl --> UI : 5: Success
+UI --> Admin : 6: Promoción eliminada
+
+@enduml

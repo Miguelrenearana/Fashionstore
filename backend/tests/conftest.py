@@ -6,7 +6,11 @@ from fastapi.testclient import TestClient
 from app.core.database import SessionLocal
 from app.main import app
 from app.models.analytics import BrowsingHistory, Notification
+from app.models.cart import Cart, CartDetail
+from app.models.inventory import Inventory
 from app.models.user import Client, Employee, PasswordReset, User
+
+STOCK_BASE = 10
 
 
 @pytest.fixture
@@ -61,6 +65,33 @@ def cleanup_users():
                 db.query(BrowsingHistory).filter(BrowsingHistory.client_id == client.id).delete()
             db.query(Employee).filter(Employee.user_id == user.id).delete()
             db.delete(user)
+        db.commit()
+    finally:
+        db.close()
+
+
+@pytest.fixture(autouse=True)
+def reset_inventory():
+    db = SessionLocal()
+    try:
+        for inv in db.query(Inventory).all():
+            if inv.quantity != STOCK_BASE or inv.reserved_quantity != 0:
+                db.query(Inventory).filter(Inventory.id == inv.id).update(
+                    {"quantity": STOCK_BASE, "reserved_quantity": 0}
+                )
+        db.commit()
+    finally:
+        db.close()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def clear_cart():
+    yield
+    db = SessionLocal()
+    try:
+        db.query(CartDetail).delete()
+        db.query(Cart).delete()
         db.commit()
     finally:
         db.close()

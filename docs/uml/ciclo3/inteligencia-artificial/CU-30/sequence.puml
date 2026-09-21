@@ -1,0 +1,26 @@
+@startuml CU-30
+actor "Cliente" as Cli
+boundary "«UI» Angular (Catálogo/Detalle)" as UI
+control "«Controller» API /recommendations" as Ctrl
+entity "«Model» RecommenderService / VectorStore" as Model
+
+Cli -> UI : Solicita recomendaciones
+UI -> Ctrl : GET /api/v1/ai/recommendations?source_variant_id=X&limit=10
+Ctrl -> Model : get_recommendations_by_variant(db, variant_id, limit)
+Model -> Model : build_product_text(variant)
+Model -> Model : EmbeddingService.encode(text)
+Model -> Model : VectorStore.recommend(vector, limit, exclude)
+Model --> Ctrl : list[RecommendationItem]
+Ctrl --> UI : list[RecommendationItem]
+UI --> Cli : Grid de recomendaciones (imagen, precio, score)
+
+Cli -> UI : Navega historial / Click "Ver también"
+UI -> Ctrl : GET /api/v1/ai/recommendations?source=history&limit=10
+Ctrl -> Model : recommend_for_client(db, client_id, limit)
+Model -> Model : _get_client_history(db, client_id)
+Model -> Model : get_recommendations(history_variant)
+Model --> Ctrl : list[RecommendationItem]
+Ctrl --> UI : list[RecommendationItem]
+UI --> Cli : Recomendaciones personalizadas
+
+@enduml

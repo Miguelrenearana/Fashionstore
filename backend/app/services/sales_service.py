@@ -44,10 +44,15 @@ class SalesService:
         for item in items:
             variant_id = item["variant_id"]
             quantity = item["quantity"]
-            inventory = db.query(Inventory).filter(
-                Inventory.branch_id == sale.branch_id,
-                Inventory.variant_id == variant_id,
-            ).first()
+            inventory = (
+                db.query(Inventory)
+                .filter(
+                    Inventory.branch_id == sale.branch_id,
+                    Inventory.variant_id == variant_id,
+                )
+                .order_by(Inventory.id)
+                .first()
+            )
             unit_price = self._consume_inventory(
                 db, sale, inventory, variant_id, quantity, reserved=reservation is not None
             )

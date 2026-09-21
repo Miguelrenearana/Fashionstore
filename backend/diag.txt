@@ -1,0 +1,31 @@
+﻿CWD            : D:\Proyectos si 2\EXAMEN 1 SI2\Plataforma-inteligente_-tienda-de-ropa\backend
+CONFTEST       : D:\Proyectos si 2\EXAMEN 1 SI2\Plataforma-inteligente_-tienda-de-ropa\backend\tests\conftest.py.FullName
+----- imports del conftest en disco -----
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.core.database import SessionLocal
+from app.main import app
+from app.models.analytics import BrowsingHistory, Notification
+from app.models.cart import Cart, CartDetail
+from app.models.inventory import Inventory
+from app.models.user import Client, Employee, PasswordReset, User
+----- pytest: 1 test, tb corto -----
+E                                                                        [100%]
+=================================== ERRORS ====================================
+_____ ERROR at setup of test_checkout_creates_reservation_and_clears_cart _____
+tests\conftest.py:76: in reset_inventory
+    if inv.quantity != STOCK_BASE or inv.reserved_quantity != 0:
+                       ^^^^^^^^^^
+E   NameError: name 'STOCK_BASE' is not defined
+============================== warnings summary ===============================
+.venv\Lib\site-packages\starlette\testclient.py:40
+  D:\Proyectos si 2\EXAMEN 1 SI2\Plataforma-inteligente_-tienda-de-ropa\backend\.venv\Lib\site-packages\starlette\testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/test_reservations.py::test_checkout_creates_reservation_and_clears_cart
+1 warning, 1 error in 4.59s

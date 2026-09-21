@@ -1,0 +1,16 @@
+@startuml CU-31
+actor "Cliente" as Cli
+boundary "«UI» Angular (Chat)" as UI
+control "«Controller» API /ai/chat" as Ctrl
+entity "«Model» AIService / Ollama" as Model
+
+Cli -> UI : 1: Escribe mensaje en chat
+UI -> Ctrl : 2: POST /api/v1/ai/chat {message, context, history}
+Ctrl -> Model : 3: chat_with_context(message, context, history)
+Model -> Model : 4: Construir prompt (system + context + history + user)
+Model -> Model : 5: Ollama.chat(messages, temperature, max_tokens)
+Model --> Ctrl : 5: {message, model, tokens}
+Ctrl --> UI : 6: AIChatResponse
+UI --> Cli : 7: Respuesta del asistente
+
+@enduml

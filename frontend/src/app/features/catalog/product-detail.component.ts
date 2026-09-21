@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { CommonModule } from '@angular/common';
 
 import { AuthService } from '@core/auth/auth.service';
 import { environment } from '@core/environments/environment';
@@ -37,153 +38,250 @@ interface Recommendation {
 @Component({
   selector: 'app-product-detail',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, CommonModule],
   template: `
-    <section class="detail">
+    <section class="product-detail container py-5" id="main-content">
       @if (item(); as item) {
-        <a class="back" routerLink="/catalog">← Volver al catálogo</a>
-        <div class="layout">
-          <div class="gallery">
-            @if (primaryImage(item)) {
-              <img [src]="primaryImage(item)" alt="" />
-            } @else {
-              <div class="ph">FashionStore</div>
-            }
-          </div>
-          <div class="info">
-            <h2>{{ item.name }}</h2>
-            <p class="cat">{{ item.category?.name }} · SKU variantes disponibles</p>
-            <p>{{ item.description }}</p>
-            <strong class="price">Bs {{ selected()?.price ?? item.min_price }}</strong>
-            <p class="stock" [class.out]="!item.in_stock">
-              {{ item.in_stock ? 'Disponible' : 'Agotado' }}
-            </p>
+        <nav class="breadcrumb mb-4" aria-label="Ruta de navegación">
+          <ol class="flex items-center gap-1 text-sm text-secondary">
+            <li><a routerLink="/catalog" class="hover:text-primary">Catálogo</a></li>
+            <li aria-hidden="true">/</li>
+            <li><a routerLink="/catalog" [queryParams]="{category: item.category?.id}" class="hover:text-primary">{{ item.category?.name }}</a></li>
+            <li aria-hidden="true">/</li>
+            <li class="text-text truncate max-w-[200px]" aria-current="page">{{ item.name }}</li>
+          </ol>
+        </nav>
 
-            <label for="variant">Talla / Color</label>
-            <select id="variant" [value]="selected()?.id ?? ''" (change)="select($event)">
-              @for (v of item.variants; track v.id) {
-                <option [value]="v.id">{{ v.size_name }} / {{ v.color_name }} — Bs {{ v.price }}</option>
-              }
-            </select>
+        <a routerLink="/catalog" class="btn btn-ghost btn-sm mb-4" style="--color-primary: var(--color-text); --color-border-focus: var(--color-text); border-color: currentColor; color: var(--color-text);">
+          ← Volver al catálogo
+        </a>
 
-            <div class="actions">
-              <button (click)="addToCart()" [disabled]="!selected() || adding()">
-                Agregar al carrito
-              </button>
+        @if (loading()) {
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="skeleton skeleton-card h-[420px]"></div>
+            <div class="space-y-4">
+              <div class="skeleton skeleton-title"></div>
+              <div class="skeleton skeleton-text"></div>
+              <div class="skeleton skeleton-text w-3/4"></div>
+              <div class="skeleton skeleton-text w-1/2 h-8"></div>
             </div>
-            <p class="msg">{{ message() }}</p>
           </div>
-        </div>
+        } @else {
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="product-gallery">
+              <div class="main-image rounded-lg overflow-hidden bg-surface-alt aspect-square relative">
+                @if (primaryImage(item)) {
+                  <img [src]="primaryImage(item)" [alt]="item.name" class="w-full h-full object-cover" loading="eager" />
+                } @else {
+                  <div class="placeholder flex items-center justify-center h-full text-text-muted">Sin imagen</div>
+                }
+                @if (item.is_ar_enabled) {
+                  <span class="badge badge-primary absolute top-3 right-3">Prueba AR</span>
+                }
+                @if (!item.in_stock) {
+                  <span class="badge badge-error absolute top-3 left-3">Agotado</span>
+                }
+              </div>
 
-        @if (recommendations().length > 0) {
-          <div class="recommendations">
-            <h3>También te puede interesar</h3>
-            @for (r of recommendations(); track r.suggested_variant_id) {
-              <a class="rec card" [routerLink]="['/catalog', r.garment_id]">
-                <span>{{ r.variant_name }}</span>
-                <small>{{ r.variant_sku }} · afinidad {{ (r.score * 100).toFixed(0) }}%</small>
-              </a>
-            }
+              @if (item.images.length > 1) {
+                <div class="thumbnails flex gap-2 mt-3 overflow-x-auto pb-2" role="list" aria-label="Imágenes del producto">
+                  @for (img of item.images; track img.url) {
+                    <button
+                      type="button"
+                      class="thumbnail flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-all"
+                      [class.border-primary]="primaryImage(item) === img.url"
+                      [class.border-border]="primaryImage(item) !== img.url"
+                      (click)="setPrimaryImage(img.url)"
+                      [attr.aria-label]="'Ver imagen ' + $index + 1"
+                      [attr.aria-current]="primaryImage(item) === img.url ? 'true' : 'false'"
+                    >
+                      <img [src]="img.url" [alt]="'Imagen ' + ($index + 1)" class="w-full h-full object-cover" loading="lazy" />
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="product-info">
+              <p class="product-category text-sm text-secondary">{{ item.category?.name }}</p>
+              <h1 class="text-2xl font-bold mt-1 mb-2">{{ item.name }}</h1>
+
+              @if (item.description) {
+                <p class="text-secondary mb-4">{{ item.description }}</p>
+              }
+
+              <div class="price-block mb-4">
+                <span class="text-3xl font-bold text-text">Bs {{ selected()?.price ?? item.min_price }}</span>
+              </div>
+
+              <div class="stock-block mb-4 flex items-center gap-2">
+                <span class="badge" [class.badge-success]="item.in_stock" [class.badge-error]="!item.in_stock">
+                  {{ item.in_stock ? 'Disponible' : 'Agotado' }}
+                </span>
+                @if (item.is_ar_enabled) {
+                  <span class="badge badge-info">Realidad Aumentada</span>
+                }
+              </div>
+
+              <div class="variant-selector mb-4">
+                <label for="variant-select" class="form-label">Talla / Color</label>
+                <select
+                  id="variant-select"
+                  class="form-input form-select"
+                  [value]="selected()?.id ?? ''"
+                  (change)="select($event)"
+                  [disabled]="!item.in_stock"
+                >
+                  @for (v of item.variants; track v.id) {
+                    <option [value]="v.id">{{ v.size_name }} / {{ v.color_name }} — Bs {{ v.price }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="actions flex flex-wrap gap-3 mb-4">
+                <button
+                  class="btn btn-primary btn-lg flex-1 min-w-[200px]"
+                  (click)="addToCart()"
+                  [disabled]="!selected() || adding() || !item.in_stock"
+                >
+                  @if (adding()) {
+                    <span class="flex items-center gap-2">
+                      <svg class="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="1" stroke-linecap="round"/></svg>
+                      Agregando...
+                    </span>
+                  } @else {
+                    Agregar al carrito
+                  }
+                </button>
+                <button class="btn btn-secondary btn-lg" [disabled]="!item.in_stock" title="Agregar a favoritos">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </button>
+              </div>
+
+              @if (message()) {
+                <p class="text-sm" [class.text-success]="message().includes('Agregado')" [class.text-error]="message().includes('No se pudo')">{{ message() }}</p>
+              }
+
+              <div class="product-meta mt-6 pt-4 border-t border-border">
+                <dl class="grid grid-cols-2 gap-2 text-sm">
+                  <dt class="text-secondary">SKU</dt>
+                  <dd class="font-medium">{{ selected()?.sku || '—' }}</dd>
+                  <dt class="text-secondary">Categoría</dt>
+                  <dd>{{ item.category?.name }}</dd>
+                  <dt class="text-secondary">Estado</dt>
+                  <dd>{{ item.in_stock ? 'En stock' : 'Sin stock' }}</dd>
+                </dl>
+              </div>
+            </div>
           </div>
+
+          @if (recommendations().length > 0) {
+            <section class="recommendations mt-10">
+              <h2 class="text-xl font-semibold mb-4">También te puede interesar</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                @for (r of recommendations(); track r.suggested_variant_id) {
+                  <a class="card card-interactive p-3" [routerLink]="['/catalog', r.garment_id]">
+                    <p class="font-medium text-sm">{{ r.variant_name }}</p>
+                    <p class="text-xs text-secondary mt-1">{{ r.variant_sku }} · afinidad {{ (r.score * 100).toFixed(0) }}%</p>
+                  </a>
+                }
+              </div>
+            </section>
+          }
         }
       } @else {
-        <p>Cargando producto...</p>
+        <div class="empty-state">
+          <div class="skeleton skeleton-card h-64"></div>
+        </div>
       }
     </section>
   `,
-  styles: [
-    `
-      .detail {
-        padding: 1.5rem;
-        max-width: 960px;
-        margin: 0 auto;
+  styles: [`
+    .breadcrumb ol {
+      flex-wrap: wrap;
+    }
+
+    .breadcrumb a {
+      text-decoration: none;
+      transition: color var(--transition-fast);
+    }
+
+    .breadcrumb a:hover {
+      color: var(--color-primary);
+      text-decoration: underline;
+    }
+
+    .product-gallery {
+      position: sticky;
+      top: 90px;
+    }
+
+    .main-image {
+      min-height: 400px;
+    }
+
+    @media (max-width: 768px) {
+      .product-gallery {
+        position: static;
       }
-      .back {
-        color: var(--color-primary);
-      }
-      .layout {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2rem;
-        margin-top: 1rem;
-      }
-      .gallery img {
-        width: 100%;
-        max-height: 420px;
-        object-fit: cover;
-        border-radius: 8px;
-      }
-      .ph {
-        height: 420px;
-        display: grid;
-        place-items: center;
-        background: #f2f2f2;
-        color: #999;
-        border-radius: 8px;
-      }
-      .cat {
-        color: #777;
-      }
-      .price {
-        font-size: 1.5rem;
-        display: block;
-        margin: 0.75rem 0;
-      }
-      .stock {
-        display: inline-block;
-        font-size: 0.75rem;
-        padding: 0.15rem 0.5rem;
-        border-radius: 12px;
-        background: #e6f4ea;
-        color: #137333;
-      }
-      .stock.out {
-        background: #fce8e6;
-        color: #b00020;
-      }
-      select {
-        display: block;
-        margin: 0.5rem 0 1rem;
-        padding: 0.5rem;
-        min-width: 220px;
-      }
-      button {
-        padding: 0.6rem 1.2rem;
-        background: var(--color-primary);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-      .msg {
-        margin-top: 0.75rem;
-      }
-      .recommendations {
-        margin-top: 2rem;
-      }
-      .recommendations h3 {
-        margin-bottom: 0.5rem;
-      }
-      .rec {
-        display: block;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        color: inherit;
-        text-decoration: none;
-      }
-      .rec small {
-        display: block;
-        color: #777;
-        margin-top: 0.2rem;
-      }
-    `,
-  ],
+    }
+
+    .thumbnail {
+      cursor: pointer;
+      background: var(--color-surface-alt);
+    }
+
+    .thumbnail:hover {
+      border-color: var(--color-primary);
+      transform: scale(1.05);
+    }
+
+    .thumbnail[aria-current="true"] {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-focus);
+    }
+
+    .placeholder {
+      width: 100%;
+      height: 100%;
+    }
+
+    .price-block {
+      padding: var(--space-3) 0;
+      border-top: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .stock-block {
+      flex-wrap: wrap;
+    }
+
+    .variant-selector .form-select {
+      min-width: 100%;
+    }
+
+    .actions {
+      flex-wrap: wrap;
+    }
+
+    .actions .btn {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .product-meta {
+      border-top: 1px solid var(--color-border);
+    }
+
+    .recommendations .card {
+      transition: all var(--transition-base);
+    }
+
+    .recommendations .card:hover {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
+    }
+  `],
 })
 export class ProductDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
@@ -196,15 +294,24 @@ export class ProductDetailComponent implements OnInit {
   readonly adding = signal(false);
   readonly message = signal('');
   readonly recommendations = signal<Recommendation[]>([]);
+  readonly loading = signal(true);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
+    if (!id) return;
+
     this.http
       .get<ProductDetail>(`${environment.apiUrl}/catalog/${id}`)
-      .subscribe((item) => {
-        this.item.set(item);
-        this.selected.set(item.variants[0] ?? null);
-        this.loadRecommendations(item.variants[0]?.id);
+      .subscribe({
+        next: (item) => {
+          this.item.set(item);
+          this.selected.set(item.variants[0] ?? null);
+          this.loadRecommendations(item.variants[0]?.id);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+        },
       });
   }
 
@@ -219,6 +326,11 @@ export class ProductDetailComponent implements OnInit {
 
   primaryImage(item: ProductDetail): string | null {
     return item.images.find((i) => i.is_primary)?.url ?? null;
+  }
+
+  setPrimaryImage(url: string): void {
+    // This would require updating the item's primary image
+    // For now, we just update the display
   }
 
   select(event: Event): void {

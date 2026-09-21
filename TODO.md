@@ -32,11 +32,8 @@ Formato:
   tiene UI de notificaciones**. Opciones: (a) sección "Mis notificaciones" en la web
   (aparecería el token), o (b) email real. Sin esto CU-03 no se completa solo desde el
   navegador.
-- [ ] **Prueba manual de la web** en navegador (PC + responsive móvil): registrar/perfil,
-  carrito + compra, POS + factura, catálogo/admin, reservas. Revisar responsive de POS y
-  panel admin en pantalla pequeña.
-- [ ] **App móvil (CU-19):** probar en **dispositivo físico con cámara** (no emulador), compilar con Android SDK/iOS pods, verificar detección de pose; opcional
-  generar APK.
+- [ ] **Prueba manual de la web** en navegador (PC): registrar/perfil, carrito + compra, POS + factura, catálogo/admin, reservas.
+- [ ] **App móvil (CU-19):** compilar **APK Android** y probar en **dispositivo físico con cámara** (no emulador), verificar detección de pose; opcional generar build iOS.
 - [ ] **BD demo limpia:** re-ejecutar `alembic upgrade head` + seed antes de una demo (los
   tests dejaron ventas/comprobantes/resets extra en Neon; no rompen, pero ensucian).
 - [ ] **Exportar diagramas:** **no se hará** (omitido).

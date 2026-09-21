@@ -1,0 +1,29 @@
+@startuml CU-35
+actor "Administrador" as Adm
+boundary "«UI» Angular (Admin/Reporte Consolidado)" as UI
+control "«Controller» API /reports/consolidated" as Ctrl
+entity "«Model» ReportService / Sale, Inventory, Receipt, Branch" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : 1: Accede a "Reporte Consolidado"
+UI -> Ctrl : 2: GET /reports/consolidated?start_date=...&end_date=...&branch_id=1
+Ctrl -> Model : 3: get_consolidated_report(start_date, end_date, branch_id)
+Model -> DB : 4: JOINs Sale + Branch + Inventory + Product
+Model -> Model : 5: Agrega ventas por sucursal (total, tickets, ticket_prom)
+Model -> Model : 6: Agrega stock por sucursal (items, valor, stock_bajo)
+Model -> Model : 7: Métricas cruzadas (rotación, sell-through)
+Model --> Ctrl : 8: ConsolidatedResponse {branches[{sales{}, inventory{}, metrics{}}], summary{}}
+Ctrl --> UI : 9: ConsolidatedResponse
+UI --> Adm : 10: Dashboard consolidado por sucursal
+
+Adm -> UI : 1: Exporta Excel (opcional)
+UI -> Ctrl : 2: GET /reports/consolidated?...&format=excel
+Ctrl -> Model : 3: get_consolidated_report(...)
+Model -> Model : 4: Genera Excel multi-hoja
+Model --> Ctrl : 5: Archivo Excel / Stream
+Ctrl --> UI : 6: Descarga
+UI --> Adm : 7: Excel descargado
+
+note right of Adm : Métricas:\n- Ventas: total, tickets, ticket_prom, items_vendidos\n- Stock: total_items, valor, stock_bajo, agotados\n- Cruzadas: rotación, sell-through, días_inventario\n- Resumen: totales globales, top/bottom sucursales
+
+@enduml

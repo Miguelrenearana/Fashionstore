@@ -1,0 +1,36 @@
+@startuml CU-28
+actor "Admin / Encargado" as Adm
+boundary "«UI» Angular (Admin/Inventario)" as UI
+control "«Controller» API /inventory/movements" as Ctrl
+entity "«Model» InventoryService / InventoryMovement" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : Accede a "Movimientos de Inventario"
+UI -> Ctrl : GET /api/v1/inventory/movements?branch_id=1&variant_id=5
+Ctrl -> Model : list_movements(db, branch_id, variant_id)
+Model -> DB : SELECT InventoryMovement con filtros ORDER BY created_at DESC
+Model --> Ctrl : list[InventoryMovementRead] {type, qty_change, reason, created_at, user}
+Ctrl --> UI : list[InventoryMovementRead]
+UI --> Adm : Lista de movimientos (entrada, salida, ajuste, transferencia, merma, devolución)
+
+note right of Adm : Tipos de movimiento:\n- PURCHASE (compra a proveedor)\n- SALE (venta)\n- RESERVATION (reserva)\n- ADJUSTMENT (ajuste manual)\n- TRANSFER_IN / TRANSFER_OUT (transferencia)\n- RETURN (devolución cliente)\n- SHRINKAGE (merma/pérdida)
+
+Adm -> UI : Registra movimiento manual (ej. merma, ajuste, transferencia)
+UI -> Ctrl : POST /api/v1/inventory/movements {branch_id, variant_id, type, qty_change, reason}
+Ctrl -> Model : create_movement(db, branch_id, variant_id, type, qty_change, reason)
+Model -> Model : Valida tipo y cantidad
+Model -> DB : INSERT InventoryMovement
+Model -> DB : UPDATE Inventory (si aplica: quantity += qty_change)
+Model --> Ctrl : InventoryMovementRead creado
+Ctrl --> UI : InventoryMovementRead
+UI --> Adm : Movimiento registrado + stock actualizado
+
+Adm -> UI : Filtra movimientos por tipo/fecha/usuario
+UI -> Ctrl : GET /api/v1/inventory/movements?type=ADJUSTMENT&start_date=...&end_date=...
+Ctrl -> Model : list_movements(db, branch_id, variant_id, type, start_date, end_date)
+Model -> DB : SELECT con filtros
+Model --> Ctrl : list[InventoryMovementRead] filtrado
+Ctrl --> UI : list filtrado
+UI --> Adm : Movimientos filtrados
+
+@enduml

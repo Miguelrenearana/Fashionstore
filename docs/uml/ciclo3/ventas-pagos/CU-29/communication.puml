@@ -1,0 +1,46 @@
+@startuml CU-29
+actor "Admin / Encargado" as Adm
+boundary "«UI» Angular (Admin/Recepción)" as UI
+control "«Controller» API /receptions" as Ctrl
+entity "«Model» ReceptionService / Reception, ReceptionDetail, Inventory" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : 1: Accede a "Registrar Recepción"
+UI -> Ctrl : 2: GET /api/v1/receptions
+Ctrl -> Model : 3: list(db, page, size, branch_id, status)
+Model -> DB : 4: SELECT Reception + Details ORDER BY created_at DESC
+Model --> Ctrl : 5: list[ReceptionRead] {id, supplier, branch, status, total_qty, created_at}
+Ctrl --> UI : 6: list[ReceptionRead]
+UI --> Adm : 7: Historial recepciones (proveedor, sucursal, estado, fecha)
+
+Adm -> UI : 1: Crea nueva recepción (OC llegada)
+UI -> Ctrl : 2: POST /receptions {branch_id, supplier_id, expected_date, details[]}
+Ctrl -> Model : 3: create(db, payload)
+Model -> Model : 4: Valida proveedor, sucursal, variantes
+Model -> DB : 5: INSERT Reception (status=PENDING)
+Model -> DB : 6: INSERT ReceptionDetail[] (qty_ordered, qty_received=0, unit_cost)
+Model --> Ctrl : 7: ReceptionFullRead creado
+Ctrl --> UI : 8: ReceptionFullRead
+UI --> Adm : 9: Recepción creada PENDING
+
+Adm -> UI : 1: Registra recepción física
+UI -> Ctrl : 2: PATCH /receptions/{id}/receive {details[{variant_id, qty_received}]}
+Ctrl -> Model : 3: receive(db, reception_id, details)
+Model -> Model : 4: qty_received += qty, valida <= qty_ordered
+Model -> DB : 5: UPDATE ReceptionDetail SET qty_received = ?
+Model -> DB : 6: UPDATE Inventory quantity += qty_received
+Model -> DB : 7: INSERT InventoryMovement (type=PURCHASE, +qty_received, reason="Recepción OC #{id}")
+Model -> Model : 8: Si todo recibido -> status = RECEIVED
+Model --> Ctrl : 9: ReceptionFullRead actualizado
+Ctrl --> UI : 10: ReceptionFullRead
+UI --> Adm : 11: Recepción completada + stock + movimientos
+
+Adm -> UI : 1: Consulta detalle recepción
+UI -> Ctrl : 2: GET /receptions/{reception_id}
+Ctrl -> Model : 3: get(db, reception_id) con joins
+Model -> DB : 4: SELECT Reception + Details + Variant + Garment + Size + Color + Supplier + Branch
+Model --> Ctrl : 5: ReceptionFullRead completo
+Ctrl --> UI : 6: ReceptionFullRead
+UI --> Adm : 7: Detalle (líneas, pedidas/recibidas, costos, proveedor, sucursal)
+
+@enduml

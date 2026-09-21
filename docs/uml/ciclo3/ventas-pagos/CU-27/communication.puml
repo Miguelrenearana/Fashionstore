@@ -1,0 +1,34 @@
+@startuml CU-27
+actor "Admin / Encargado" as Adm
+boundary "«UI» Angular (Admin/Inventario)" as UI
+control "«Controller» API /inventory" as Ctrl
+entity "«Model» InventoryService / Inventory, InventoryMovement" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : 1: Accede a "Gestión de Existencias"
+UI -> Ctrl : 2: GET /api/v1/inventory?branch_id=1&variant_id=5
+Ctrl -> Model : 3: list(db, branch_id, variant_id)
+Model -> DB : 4: SELECT Inventory WHERE branch_id = ?
+Model --> Ctrl : 5: list[InventoryRead] {branch_id, variant_id, qty, reserved, available}
+Ctrl --> UI : 6: list[InventoryRead]
+UI --> Adm : 7: Tabla existencias (cantidad, reservado, disponible)
+
+Adm -> UI : 1: Ajusta stock (corrección/merma)
+UI -> Ctrl : 2: PATCH /inventory/{branch_id}/{variant_id}/adjust {qty_change, reason}
+Ctrl -> Model : 3: adjust(db, branch_id, variant_id, qty_change, reason)
+Model -> Model : 4: Valida resultado >= 0
+Model -> DB : 5: UPDATE Inventory SET quantity = quantity + ?
+Model -> DB : 6: INSERT InventoryMovement (type=ADJUSTMENT, qty_change, reason)
+Model --> Ctrl : 7: InventoryRead actualizado
+Ctrl --> UI : 8: InventoryRead
+UI --> Adm : 9: Stock actualizado + movimiento
+
+Adm -> UI : 1: Consulta historial movimientos
+UI -> Ctrl : 2: GET /api/v1/inventory/movements?branch_id=1&variant_id=5
+Ctrl -> Model : 3: list_movements(db, branch_id, variant_id)
+Model -> DB : 4: SELECT InventoryMovement ORDER BY created_at DESC
+Model --> Ctrl : 5: list[InventoryMovementRead]
+Ctrl --> UI : 6: list[InventoryMovementRead]
+UI --> Adm : 7: Historial (tipo, cantidad, motivo, fecha, usuario)
+
+@enduml

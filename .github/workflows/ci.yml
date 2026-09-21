@@ -2,22 +2,16 @@ name: CI
 
 on:
   push:
-    branches:
-      - dev
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - dev
-      - main
+    branches: [main]
 
 jobs:
   backend:
-    name: Backend — lint + tests
+    name: Backend (ruff + pytest)
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: postgresql+psycopg://fashion:change-me@localhost:5432/fashionstore
     services:
-      db:
+      postgres:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: fashion
@@ -26,44 +20,67 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U fashion -d fashionstore"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd="pg_isready -U fashion -d fashionstore"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install backend deps
-        working-directory: backend
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          pip install ruff pytest
           pip install -r requirements.txt
-      - name: Ruff lint
-        working-directory: backend
-        run: ruff check app scripts
-      - name: Apply migrations
-        working-directory: backend
-        run: alembic upgrade head
-      - name: Seed
-        working-directory: backend
-        run: python -m scripts.seed
-      - name: Tests
-        working-directory: backend
+      - name: Ruff check
+        run: ruff check app tests
+      - name: Create DB extensions
+        run: psql "postgresql://fashion:change-me@localhost:5432/fashionstore" -f scripts/init_extensions.sql
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+psycopg://fashion:change-me@localhost:5432/fashionstore
         run: pytest -q
 
   frontend:
-    name: Frontend — build
+    name: Frontend (ng build)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Install + build
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build -- --configuration production
+
+  mobile:
+    name: Mobile (analyze + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.1"
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test

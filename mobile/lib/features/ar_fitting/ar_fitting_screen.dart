@@ -3,29 +3,32 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 
+import '../../core/di/providers.dart';
 import 'garment_overlay_painter.dart';
 import 'pose_detector.dart';
 
 /// Virtual fitting room (CU-19): real camera preview + MediaPipe pose
 /// landmarks (shoulders/hips) + a draggable/scalable 2D garment overlay.
-class ArFittingScreen extends StatefulWidget {
+class ArFittingScreen extends ConsumerStatefulWidget {
   const ArFittingScreen({super.key, required this.variantId});
 
   final int variantId;
 
   @override
-  State<ArFittingScreen> createState() => _ArFittingScreenState();
+  ConsumerState<ArFittingScreen> createState() => _ArFittingScreenState();
 }
 
-class _ArFittingScreenState extends State<ArFittingScreen> {
+class _ArFittingScreenState extends ConsumerState<ArFittingScreen> {
   final _poseService = PoseService();
   CameraController? _controller;
   bool _cameraReady = false;
   bool _poseMode = true;
   bool _overlayVisible = true;
   bool _detecting = false;
+  String _garmentName = '';
   List<Offset> _landmarks = const [];
   Offset _overlayOffset = Offset.zero;
   double _overlayScale = 1.0;
@@ -35,6 +38,22 @@ class _ArFittingScreenState extends State<ArFittingScreen> {
   void initState() {
     super.initState();
     _initCamera();
+    _loadArConfig();
+  }
+
+  Future<void> _loadArConfig() async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/catalog/${widget.variantId}/ar-config');
+      if (mounted) {
+        setState(() {
+          _garmentName = (data['garment_name'] as String?) ?? '';
+        });
+      }
+    } catch (_) {
+      // Keep the placeholder label if the AR config is unavailable.
+    }
   }
 
   Future<void> _initCamera() async {
@@ -142,7 +161,9 @@ class _ArFittingScreenState extends State<ArFittingScreen> {
                     CustomPaint(
                       painter: GarmentOverlayPainter(
                         placeholderSrc: 'assets/images/placeholders/hoodie_front.png',
-                        label: 'Variante #${widget.variantId}',
+                        label: _garmentName.isNotEmpty
+                            ? _garmentName
+                            : 'Variante #${widget.variantId}',
                         offset: _overlayOffset,
                         scale: _overlayScale,
                         landmarks: _landmarks,

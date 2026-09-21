@@ -1,0 +1,56 @@
+@startuml CU-34
+actor "Administrador" as Adm
+boundary "«UI» Angular (Admin/Auditoría)" as UI
+control "«Controller» API /reports/audit-log" as Ctrl
+entity "«Model» AuditService / AuditLog" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : Accede a "Bitácora y Trazabilidad"
+UI -> Ctrl : GET /api/v1/reports/audit-log?page=1&size=20
+Ctrl -> Model : get_audit_log(page, size)
+Model -> DB : SELECT AuditLog ORDER BY created_at DESC LIMIT ? OFFSET ?
+Model --> Ctrl : AuditLogPageResponse {items[], total, page, size, pages}
+Ctrl --> UI : AuditLogPageResponse
+UI --> Adm : Lista paginada de auditoría (usuario, acción, entidad, entidad_id, timestamp, diff)
+
+Adm -> UI : Filtra por usuario
+UI -> Ctrl : GET /api/v1/reports/audit-log?user_id=5&page=1&size=20
+Ctrl -> Model : get_audit_log(page, size, user_id=5)
+Model -> DB : SELECT AuditLog WHERE user_id = ? ORDER BY created_at DESC
+Model --> Ctrl : AuditLogPageResponse filtrado
+Ctrl --> UI : AuditLogPageResponse
+UI --> Adm : Auditoría filtrada por usuario
+
+Adm -> UI : Filtra por acción (CREATE, UPDATE, DELETE, LOGIN, etc.)
+UI -> Ctrl : GET /api/v1/reports/audit-log?action=UPDATE&page=1&size=20
+Ctrl -> Model : get_audit_log(page, size, action='UPDATE')
+Model -> DB : SELECT AuditLog WHERE action = ? ORDER BY created_at DESC
+Model --> Ctrl : AuditLogPageResponse filtrado
+Ctrl --> UI : AuditLogPageResponse
+UI --> Adm : Auditoría filtrada por tipo de acción
+
+Adm -> UI : Filtra por entidad (Product, Sale, User, Inventory, etc.)
+UI -> Ctrl : GET /api/v1/reports/audit-log?entity=Sale&page=1&size=20
+Ctrl -> Model : get_audit_log(page, size, entity='Sale')
+Model -> DB : SELECT AuditLog WHERE entity = ? ORDER BY created_at DESC
+Model --> Ctrl : AuditLogPageResponse filtrado
+Ctrl --> UI : AuditLogPageResponse
+UI --> Adm : Auditoría filtrada por entidad
+
+Adm -> UI : Filtra por rango de fechas
+UI -> Ctrl : GET /api/v1/reports/audit-log?start_date=2024-01-01&end_date=2024-12-31
+Ctrl -> Model : get_audit_log(page, size, start_date, end_date)
+Model -> DB : SELECT AuditLog WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC
+Model --> Ctrl : AuditLogPageResponse filtrado
+Ctrl --> UI : AuditLogPageResponse
+UI --> Adm : Auditoría en rango de fechas
+
+Adm -> UI : Combina múltiples filtros
+UI -> Ctrl : GET /api/v1/reports/audit-log?user_id=5&action=UPDATE&entity=Product&start_date=...&end_date=...
+Ctrl -> Model : get_audit_log(page, size, user_id, action, entity, start_date, end_date)
+Model -> DB : SELECT con múltiples WHERE
+Model --> Ctrl : AuditLogPageResponse filtrado
+Ctrl --> UI : AuditLogPageResponse
+UI --> Adm : Trazabilidad completa combinada
+
+@enduml

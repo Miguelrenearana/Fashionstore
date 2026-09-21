@@ -1,0 +1,46 @@
+@startuml CU-25
+actor "Cliente" as Cli
+boundary "«UI» Angular (Checkout/Pago)" as UI
+control "«Controller» API /payments" as Ctrl
+entity "«Model» PaymentService / StaticQRGateway" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Cli -> UI : Inicia compra / checkout
+UI -> Ctrl : POST /api/v1/payments/initiate {sale_id, method}
+Ctrl -> Model : pay(order_ref, amount, email, description)
+Model -> Model : Genera referencia única (PAY-XXX)
+Model -> Model : Crea Payment PENDING en DB
+Model -> DB : INSERT Payment (gateway_ref, sale_id, amount, status=PENDING)
+Model --> Ctrl : PaymentRead {reference, amount, currency, status, qr_expires_at}
+Ctrl --> UI : PaymentRead + URLs QR
+UI --> Cli : Muestra página de pago con QR
+
+Cli -> UI : Escanea QR con app bancaria / Click "Pagar Ahora"
+UI -> Ctrl : GET /api/v1/payments/pay/{reference}
+Ctrl -> Model : Recupera Payment por reference
+Model -> DB : SELECT * FROM Payment WHERE gateway_ref = ?
+Model --> Ctrl : Payment info + QR SVG URL
+Ctrl --> UI : Página HTML con QR + botón "Pagar"
+UI --> Cli : Página de pago (QR + botón + cuenta regresiva)
+
+alt Pago manual (click "Pagar Ahora")
+    UI -> Ctrl : POST /api/v1/payments/webhook/static_qr {reference, status: COMPLETED, amount}
+    Ctrl -> Model : Verifica firma HMAC (X-Signature)
+    Model -> DB : UPDATE Payment SET status=COMPLETED, qr_verified_at=NOW()
+    Model -> DB : UPDATE Sale SET status=PAID, paid_at=NOW()
+    Model -> Model : Genera comprobante (ReceiptService)
+    Model --> Ctrl : {success: true, message: "Payment completed"}
+    Ctrl --> UI : Redirección a /success
+    UI --> Cli : Confirmación de pago exitoso
+else Pago automático (polling / timeout)
+    UI -> Ctrl : GET /api/v1/payments/qr/status/{reference} (polling cada 5s)
+    Ctrl -> Model : Verifica auto-complete + timeout
+    Model -> DB : SELECT * FROM Payment WHERE gateway_ref = ?
+    Model -> Model : StaticQRGateway.check_auto_complete(ref)
+    Model -> Model : Si expira -> TIMEOUT
+    Model --> Ctrl : {reference, status, verified_at}
+    Ctrl --> UI : Estado actualizado
+    UI --> Cli : Actualiza UI (completado / timeout)
+end
+
+@enduml

@@ -34,6 +34,7 @@ mobile/.flutter-plugins-dependencies
 mobile/.metadata
 mobile/android/.gradle/
 mobile/android/app/build/
+mobile/android/.kotlin/
 mobile/ios/Pods/
 *.iml
 

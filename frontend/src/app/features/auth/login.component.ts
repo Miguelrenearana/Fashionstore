@@ -29,8 +29,6 @@ import { AuthService } from '@core/auth/auth.service';
       </form>
       <p>
         <a routerLink="/auth/forgot-password">Olvidé mi contraseña</a>
-        ·
-        <a routerLink="/auth/register">Crear cuenta</a>
       </p>
       @if (error) {
         <p class="error">{{ error }}</p>
@@ -72,8 +70,8 @@ export class LoginComponent {
 
   onSubmit(): void {
     this.auth.login(this.email, this.password).subscribe({
-      next: () => this.router.navigate(['/catalog']),
-      error: () => (this.error = 'Credenciales invÃ¡lidas'),
+      next: () => this.router.navigate([this.auth.homeRoute()]),
+      error: () => (this.error = 'Credenciales inválidas'),
     });
   }
 }

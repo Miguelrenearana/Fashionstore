@@ -99,4 +99,18 @@ class CatalogVariantRead(ORMModel):
     color_name: str
 
 
+class ArVariantRead(ORMModel):
+    id: int
+    sku: str
+    size_name: str
+    color_name: str
+
+
+class ArConfigRead(ORMModel):
+    garment_id: int
+    garment_name: str
+    is_ar_enabled: bool
+    variants: list[ArVariantRead] = []
+
+
 CatalogItemRead.model_rebuild()

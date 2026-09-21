@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
 from app.core.dependencies import DbSession
-from app.schemas.catalog import CatalogItemRead, CategoryRead
+from app.schemas.catalog import ArConfigRead, ArVariantRead, CatalogItemRead, CategoryRead
 from app.schemas.common import Page
 from app.services.catalog_service import catalog_service
 
@@ -35,3 +35,17 @@ def list_catalog(
 @router.get("/{garment_id}", response_model=CatalogItemRead)
 def get_catalog_item(db: DbSession, garment_id: int):
     return catalog_service.get(db, garment_id)
+
+
+@router.get("/{garment_id}/ar-config", response_model=ArConfigRead)
+def get_ar_config(db: DbSession, garment_id: int):
+    garment = catalog_service.get_ar_config(db, garment_id)
+    return ArConfigRead(
+        garment_id=garment.id,
+        garment_name=garment.name,
+        is_ar_enabled=garment.is_ar_enabled,
+        variants=[
+            ArVariantRead(id=v.id, sku=v.sku, size_name=v.size.name, color_name=v.color.name)
+            for v in garment.variations
+        ],
+    )

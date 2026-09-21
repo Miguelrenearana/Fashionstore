@@ -1,0 +1,46 @@
+@startuml CU-29
+actor "Admin / Encargado" as Adm
+boundary "«UI» Angular (Admin/Recepción)" as UI
+control "«Controller» API /receptions" as Ctrl
+entity "«Model» ReceptionService / Reception, ReceptionDetail, Inventory" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : Accede a "Registrar Recepción"
+UI -> Ctrl : GET /api/v1/receptions (lista recepciones previas)
+Ctrl -> Model : list(db, page, size, branch_id, status)
+Model -> DB : SELECT Reception + Details ORDER BY created_at DESC
+Model --> Ctrl : list[ReceptionRead] {id, supplier, branch, status, total_qty, created_at}
+Ctrl --> UI : list[ReceptionRead]
+UI --> Adm : Historial de recepciones (proveedor, sucursal, estado, fecha)
+
+Adm -> UI : Crea nueva recepción (orden de compra llegada)
+UI -> Ctrl : POST /api/v1/receptions {branch_id, supplier_id, expected_date, details[{variant_id, quantity, unit_cost}]}
+Ctrl -> Model : create(db, payload)
+Model -> Model : Valida proveedor, sucursal, variantes activas
+Model -> DB : INSERT Reception (status=PENDING)
+Model -> DB : INSERT ReceptionDetail[] (variant_id, qty_ordered, qty_received=0, unit_cost)
+Model --> Ctrl : ReceptionFullRead creado
+Ctrl --> UI : ReceptionFullRead
+UI --> Adm : Recepción creada en estado PENDING
+
+Adm -> UI : Registra recepción física (cuenta mercancía)
+UI -> Ctrl : PATCH /api/v1/receptions/{id}/receive {details[{variant_id, qty_received}]}
+Ctrl -> Model : receive(db, reception_id, details)
+Model -> Model : Para cada detail: qty_received += qty, valida <= qty_ordered
+Model -> DB : UPDATE ReceptionDetail SET qty_received = ?
+Model -> DB : UPDATE Inventory SET quantity = quantity + qty_received (por sucursal+variante)
+Model -> DB : INSERT InventoryMovement (type=PURCHASE, qty_change=+qty_received, reason="Recepción OC #{id}")
+Model -> Model : Si todos details recibidos -> Reception.status = RECEIVED
+Model --> Ctrl : ReceptionFullRead actualizado
+Ctrl --> UI : ReceptionFullRead
+UI --> Adm : Recepción completada + stock actualizado + movimientos creados
+
+Adm -> UI : Consulta detalle de recepción
+UI -> Ctrl : GET /api/v1/receptions/{reception_id}
+Ctrl -> Model : get(db, reception_id) con joins
+Model -> DB : SELECT Reception + Details + Variant + Garment + Size + Color + Supplier + Branch
+Model --> Ctrl : ReceptionFullRead completo
+Ctrl --> UI : ReceptionFullRead
+UI --> Adm : Detalle completo (líneas, cantidades pedidas/recibidas, costos, proveedor, sucursal)
+
+@enduml

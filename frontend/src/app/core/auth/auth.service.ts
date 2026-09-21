@@ -10,6 +10,8 @@ export interface LoginResponse {
   token_type: string;
 }
 
+const STAFF_ROLES = ['ADMIN', 'MANAGER', 'CASHIER', 'BRANCH_MANAGER'];
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly token = signal<string | null>(localStorage.getItem('fs_token'));
@@ -36,7 +38,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem('fs_token');
     this.token.set(null);
-    this.router.navigate(['/catalog']);
+    this.router.navigate(['/']);
   }
 
   isAuthenticated(): boolean {
@@ -46,5 +48,37 @@ export class AuthService {
   storeToken(access_token: string): void {
     localStorage.setItem('fs_token', access_token);
     this.token.set(access_token);
+  }
+
+  /** Roles del JWT (claim `roles`), sin dependencia del servidor. */
+  roles(): string[] {
+    const token = this.token();
+    if (!token) return [];
+    try {
+      const payloadPart = token.split('.')[1];
+      if (!payloadPart) return [];
+      const json = atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(json) as { roles?: string[] };
+      return payload.roles ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  hasAnyRole(...roles: string[]): boolean {
+    const mine = new Set(this.roles());
+    return roles.some((r) => mine.has(r));
+  }
+
+  /** ¿Es personal autorizado para la consola web (admin/staff/pos)? */
+  isStaff(): boolean {
+    return this.hasAnyRole(...STAFF_ROLES);
+  }
+
+  /** Ruta de inicio según rol tras iniciar sesión. */
+  homeRoute(): string {
+    if (this.hasAnyRole('ADMIN', 'MANAGER')) return '/admin';
+    if (this.hasAnyRole('BRANCH_MANAGER', 'CASHIER')) return '/staff';
+    return '/';
   }
 }

@@ -1,0 +1,48 @@
+@startuml CU-33
+actor "Administrador" as Adm
+boundary "«UI» Angular (Admin/Reportes)" as UI
+control "«Controller» API /reports" as Ctrl
+entity "«Model» ReportService / Sale, Inventory, Receipt" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : 1: Accede a "Reportes e Indicadores"
+UI -> Ctrl : 2: GET /reports/indicators?start_date=...&end_date=...&branch_id=1
+Ctrl -> Model : 3: get_sales_indicators(start_date, end_date, branch_id)
+Model -> DB : 4: Agregaciones SUM/COUNT/AVG sobre Sale, SaleDetail, Inventory
+Model --> Ctrl : 5: IndicatorsResponse {total_sales, revenue, avg_ticket, orders, top_branch}
+Ctrl --> UI : 6: IndicatorsResponse
+UI --> Adm : 7: Dashboard KPIs
+
+Adm -> UI : 1: Consulta stock bajo
+UI -> Ctrl : 2: GET /reports/stock?branch_id=1&threshold=10
+Ctrl -> Model : 3: get_stock_indicators(branch_id, threshold)
+Model -> DB : 4: SELECT Inventory WHERE quantity <= threshold
+Model --> Ctrl : 5: LowStockResponse {low_stock[], out_of_stock[], summary}
+Ctrl --> UI : 6: LowStockResponse
+UI --> Adm : 7: Productos stock bajo/agotado
+
+Adm -> UI : 1: Ventas por período
+UI -> Ctrl : 2: GET /reports/sales-by-period?period_type=monthly&start_date=...&end_date=...
+Ctrl -> Model : 3: get_sales_by_period(period_type, start_date, end_date, branch_id)
+Model -> DB : 4: SELECT DATE_TRUNC('month', created_at), SUM(total_amount) GROUP BY 1
+Model --> Ctrl : 5: SalesByPeriodResponse {periods[], total}
+Ctrl --> UI : 6: SalesByPeriodResponse
+UI --> Adm : 7: Gráfico ventas día/semana/mes
+
+Adm -> UI : 1: Top productos
+UI -> Ctrl : 2: GET /reports/top-products?start_date=...&end_date=...&limit=10
+Ctrl -> Model : 3: get_top_products(start_date, end_date, limit, branch_id)
+Model -> DB : 4: SELECT variant, SUM(qty) FROM SaleDetail JOIN Sale GROUP BY variant ORDER BY 2 DESC
+Model --> Ctrl : 5: TopProductsResponse {products[], total}
+Ctrl --> UI : 6: TopProductsResponse
+UI --> Adm : 7: Top 10 más vendidos
+
+Adm -> UI : 1: Rotación inventario
+UI -> Ctrl : 2: GET /reports/inventory-turnover?start_date=...&end_date=...&branch_id=1
+Ctrl -> Model : 3: get_inventory_turnover(start_date, end_date, branch_id)
+Model -> DB : 4: Cálculo rotación = COGS / Stock promedio
+Model --> Ctrl : 5: InventoryTurnoverResponse {turnover_rate, days_inventory, cogs, avg_stock}
+Ctrl --> UI : 6: InventoryTurnoverResponse
+UI --> Adm : 7: Rotación (veces/año, días inventario)
+
+@enduml

@@ -11,24 +11,26 @@ import { AuthService } from '@core/auth/auth.service';
 
     <header class="navbar" role="banner">
       <div class="navbar-container container flex items-center justify-between">
-        <a class="brand" routerLink="/catalog" aria-label="FashionStore - Inicio">
+        <a class="brand" routerLink="/" aria-label="FashionStore - Inicio">
           <span class="brand-icon" aria-hidden="true">🛍️</span>
           <span class="brand-text">FashionStore</span>
         </a>
 
         <nav class="navbar-nav desktop-nav" aria-label="Navegación principal">
-          <a routerLink="/catalog" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-link">Catálogo</a>
-          <a routerLink="/cart" routerLinkActive="active" class="nav-link">Carrito</a>
-          <a routerLink="/reservations" routerLinkActive="active" class="nav-link">Reservas</a>
+          @if (auth.isAuthenticated() && auth.hasAnyRole('ADMIN', 'MANAGER')) {
+            <a routerLink="/admin" routerLinkActive="active" class="nav-link">Administración</a>
+          }
+          @if (auth.isAuthenticated() && auth.hasAnyRole('BRANCH_MANAGER', 'CASHIER', 'ADMIN', 'MANAGER')) {
+            <a routerLink="/staff" routerLinkActive="active" class="nav-link">Reservas</a>
+            <a routerLink="/pos" routerLinkActive="active" class="nav-link">POS</a>
+          }
         </nav>
 
         <div class="navbar-actions desktop-actions flex items-center gap-2">
           @if (!auth.isAuthenticated()) {
             <a routerLink="/auth" routerLinkActive="active" class="btn btn-ghost nav-link">Iniciar sesión</a>
           } @else {
-            <a routerLink="/profile" routerLinkActive="active" class="btn btn-ghost nav-link">Perfil</a>
-            <a routerLink="/branch" routerLinkActive="active" class="btn btn-ghost nav-link">Sucursales</a>
-            <a routerLink="/admin" routerLinkActive="active" class="btn btn-ghost nav-link">Admin</a>
+            <span class="roles">{{ auth.roles().join(' · ') || 'Usuario' }}</span>
             <button (click)="logout()" class="btn btn-outline btn-sm" style="--color-primary: var(--color-text-on-nav); --color-border-focus: var(--color-text-on-nav); border-color: currentColor; color: var(--color-text-on-nav);">Salir</button>
           }
         </div>
@@ -54,27 +56,13 @@ import { AuthService } from '@core/auth/auth.service';
       @if (mobileMenuOpen()) {
         <div class="mobile-nav-overlay" (click)="closeMobileMenu()" aria-hidden="true"></div>
         <nav id="mobile-nav" class="mobile-nav" role="navigation" aria-label="Menú móvil">
-          <div class="mobile-nav-header">
-            @if (auth.isAuthenticated()) {
-              <div class="mobile-user">
-                <div class="avatar avatar-lg" style="background: var(--color-primary-light); color: var(--color-primary-dark);">
-                  {{ getInitials() }}
-                </div>
-                <div class="mobile-user-info">
-                  <p class="font-medium">Usuario</p>
-                  <p class="text-xs text-muted">Sesión activa</p>
-                </div>
-              </div>
-            }
-          </div>
           <ul class="mobile-nav-list">
-            <li><a routerLink="/catalog" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="mobile-nav-link" (click)="closeMobileMenu()">Catálogo</a></li>
-            @if (auth.isAuthenticated()) {
-              <li><a routerLink="/cart" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Carrito</a></li>
-              <li><a routerLink="/reservations" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Reservas</a></li>
-              <li><a routerLink="/profile" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Perfil</a></li>
-              <li><a routerLink="/branch" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Sucursales</a></li>
-              <li><a routerLink="/admin" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Admin</a></li>
+            @if (auth.isAuthenticated() && auth.hasAnyRole('ADMIN', 'MANAGER')) {
+              <li><a routerLink="/admin" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Administración</a></li>
+            }
+            @if (auth.isAuthenticated() && auth.hasAnyRole('BRANCH_MANAGER', 'CASHIER', 'ADMIN', 'MANAGER')) {
+              <li><a routerLink="/staff" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Reservas</a></li>
+              <li><a routerLink="/pos" routerLinkActive="active" class="mobile-nav-link" (click)="closeMobileMenu()">Punto de venta</a></li>
             }
           </ul>
           <div class="mobile-nav-footer">
@@ -88,7 +76,8 @@ import { AuthService } from '@core/auth/auth.service';
       }
     </header>
   `,
-  styles: [`
+  styles: [
+    `
     .navbar {
       position: sticky;
       top: 0;
@@ -181,6 +170,15 @@ import { AuthService } from '@core/auth/auth.service';
       }
     }
 
+    .roles {
+      color: var(--color-text-on-nav);
+      font-size: var(--text-xs);
+      opacity: 0.85;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
     .mobile-menu-btn {
       display: flex;
       align-items: center;
@@ -205,7 +203,6 @@ import { AuthService } from '@core/auth/auth.service';
       }
     }
 
-    /* Mobile Menu */
     .mobile-nav-overlay {
       position: fixed;
       inset: 0;
@@ -239,22 +236,6 @@ import { AuthService } from '@core/auth/auth.service';
         transform: translateX(0);
         opacity: 1;
       }
-    }
-
-    .mobile-nav-header {
-      padding: var(--space-4);
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .mobile-user {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-    }
-
-    .mobile-user-info p {
-      margin: 0;
-      line-height: 1.3;
     }
 
     .mobile-nav-list {
@@ -320,11 +301,6 @@ export class NavbarComponent {
 
   logout() {
     this.auth.logout();
-    this.router.navigate(['/catalog']);
     this.closeMobileMenu();
-  }
-
-  getInitials(): string {
-    return 'U';
   }
 }

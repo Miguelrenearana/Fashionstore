@@ -1,0 +1,34 @@
+@startuml CU-26
+actor "Cliente" as Cli
+actor "Cajero" as Caj
+boundary "«UI» Angular (Perfil/Comprobantes)" as UI
+control "«Controller» API /receipts" as Ctrl
+entity "«Model» ReceiptService / Receipt, Sale" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Cli -> UI : Accede a "Mis comprobantes"
+UI -> Ctrl : GET /api/v1/receipts?page=1&size=20
+Ctrl -> Model : list(db, client_id, page, size)
+Model -> DB : SELECT Receipt JOIN Sale WHERE Sale.client_id = ?
+Model --> Ctrl : ReceiptPageResponse {items[], total, page, size}
+Ctrl --> UI : ReceiptPageResponse
+UI --> Cli : Lista paginada de comprobantes (tipo, RNC/CUF, total, fecha, sucursal)
+
+Cli -> UI : Click en un comprobante
+UI -> Ctrl : GET /api/v1/receipts/{receipt_id}
+Ctrl -> Model : get(db, receipt_id) con joins
+Model -> DB : SELECT Receipt + Sale + Branch + Details + Variant + Garment + Size + Color
+Model --> Ctrl : Receipt completo con items
+Ctrl --> UI : Detalle de comprobante
+UI --> Cli : Detalle completo (items, precios, totales, sucursal, RNC/CUF, URL documento)
+
+note right of Caj : Cajero puede ver comprobantes\nde sus ventas en POS
+Caj -> UI : Accede a comprobantes POS
+UI -> Ctrl : GET /api/v1/receipts?sale_id=X (admin/manager)
+Ctrl -> Model : list(db, filters...)
+Model -> DB : SELECT con filtros
+Model --> Ctrl : ReceiptPageResponse
+Ctrl --> UI : Lista filtrada
+UI --> Caj : Comprobantes de la venta
+
+@enduml

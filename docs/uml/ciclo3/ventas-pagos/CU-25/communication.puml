@@ -1,0 +1,46 @@
+@startuml CU-25
+actor "Cliente" as Cli
+boundary "«UI» Angular (Checkout/Pago)" as UI
+control "«Controller» API /payments" as Ctrl
+entity "«Model» PaymentService / StaticQRGateway" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Cli -> UI : 1: Inicia compra / checkout
+UI -> Ctrl : 2: POST /api/v1/payments/initiate {sale_id, method}
+Ctrl -> Model : 3: pay(order_ref, amount, email, description)
+Model -> Model : 4: Genera referencia única (PAY-XXX)
+Model -> Model : 5: Crea Payment PENDING
+Model -> DB : 6: INSERT Payment
+Model --> Ctrl : 7: PaymentRead {ref, amount, status, qr_expires_at}
+Ctrl --> UI : 8: PaymentRead + URLs QR
+UI --> Cli : 9: Muestra página de pago con QR
+
+Cli -> UI : 1: Escanea QR / Click "Pagar"
+UI -> Ctrl : 2: GET /api/v1/payments/pay/{reference}
+Ctrl -> Model : 3: Recupera Payment por reference
+Model -> DB : 4: SELECT Payment
+Model --> Ctrl : 5: Payment info + QR SVG URL
+Ctrl --> UI : 6: Página HTML con QR + botón
+UI --> Cli : 7: Página de pago (QR + botón + cuenta regresiva)
+
+alt Pago manual
+    UI -> Ctrl : 1: POST /webhook/static_qr {ref, COMPLETED, amount}
+    Ctrl -> Model : 2: Verifica HMAC (X-Signature)
+    Model -> DB : 3: UPDATE Payment status=COMPLETED
+    Model -> DB : 4: UPDATE Sale status=PAID
+    Model -> Model : 5: Genera comprobante (ReceiptService)
+    Model --> Ctrl : 6: {success: true}
+    Ctrl --> UI : 7: Redirección /success
+    UI --> Cli : 8: Confirmación pago
+else Pago automático (polling)
+    UI -> Ctrl : 1: GET /qr/status/{ref} (cada 5s)
+    Ctrl -> Model : 2: Verifica auto-complete + timeout
+    Model -> DB : 3: SELECT Payment
+    Model -> Model : 4: StaticQRGateway.check_auto_complete()
+    Model -> Model : 5: Si expira -> TIMEOUT
+    Model --> Ctrl : 6: {reference, status, verified_at}
+    Ctrl --> UI : 7: Estado actualizado
+    UI --> Cli : 8: Actualiza UI
+end
+
+@enduml

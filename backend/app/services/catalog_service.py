@@ -58,5 +58,19 @@ class CatalogService:
     def list_categories(self, db: Session) -> list[Category]:
         return db.query(Category).filter(Category.is_active).order_by(Category.name).all()
 
+    def get_ar_config(self, db: Session, garment_id: int) -> Garment:
+        item = (
+            db.query(Garment)
+            .filter(Garment.id == garment_id, Garment.is_active)
+            .options(
+                joinedload(Garment.variations).joinedload(GarmentVariant.size),
+                joinedload(Garment.variations).joinedload(GarmentVariant.color),
+            )
+            .first()
+        )
+        if not item:
+            raise NotFoundError("Garment not found.")
+        return item
+
 
 catalog_service = CatalogService()

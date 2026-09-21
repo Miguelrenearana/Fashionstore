@@ -17,8 +17,9 @@ Formato:
 - [x] **Render**: backend desplegado desde `render.yaml` (Docker) con health check `/health`.
 - [x] **Vercel**: frontend importado con rewrites SPA de `vercel.json`.
 - [x] **GitHub**: repo subido y sincronizado (origin/main).
-- [ ] **Firebase**: **no requerido** (se omite).
+- [ ] **Firebase**: **no requerido** (se omite). FCM preferido, pero sin proyecto Firebase/`google-services.json` (no se publica en Play Store) no se integra el push real (Fase 8: OMITIDO).
 - [ ] **PagosNet (sandbox)**: **no requerido** (se usa gateway QR estático mock; se habilita solo si lo pide el dueño).
+- [x] **Fase 8 (Integración + Deploy)** completada 21/09/2026: deep link `fashionstore://fitting/:variantId` (intent-filter Android + enlace web→app en el landing), endpoint `GET /api/v1/catalog/:id/ar-config` (nuevo, consumido por `ArFittingScreen`), Angular PWA (`ng add @angular/pwa`, manifest con paleta, `ngsw.json`), CI/CD `.github/workflows/ci.yml` (backend ruff+pytest con Postgres pgvector, frontend build, mobile analyze+test). Play Store cancelado (solo APK side-loading, decisión del dueño). `flutter build apk --release` regenerado ✓. Pendiente: push a repo → redeploy Vercel.
 
 ## 🟡 Técnicos (pendientes reales)
 
@@ -33,7 +34,7 @@ Formato:
   (aparecería el token), o (b) email real. Sin esto CU-03 no se completa solo desde el
   navegador.
 - [ ] **Prueba manual de la web** en navegador (PC): registrar/perfil, carrito + compra, POS + factura, catálogo/admin, reservas.
-- [ ] **App móvil (CU-19):** compilar **APK Android** y probar en **dispositivo físico con cámara** (no emulador), verificar detección de pose; opcional generar build iOS.
+- [x] **App móvil (CU-19):** **APK Android compilado** (`mobile/build/app/outputs/flutter-apk/app-release.apk`, 94.4 MB, 21/09/2026) con `flutter build apk --release` (se regeneró la carpeta `android/` que faltaba). Siendo directivas del dueño, se quitaron el catálogo público, carrito, checkout, perfil y reservas de la **web** (movidos a la app Flutter); la web queda como **Admin/Staff/POS/Landing SEO** (Fase 7, `ng build` OK). Deep links `fashionstore://fitting/:variantId` conectados (Fase 8). **Pendiente:** probar en **dispositivo físico con cámara** (CU-19 AR) y los deep links.
 - [ ] **BD demo limpia:** re-ejecutar `alembic upgrade head` + seed antes de una demo (los
   tests dejaron ventas/comprobantes/resets extra en Neon; no rompen, pero ensucian).
 - [ ] **Exportar diagramas:** **no se hará** (omitido).

@@ -1,0 +1,97 @@
+{
+  "theme": "FashionStore",
+  "version": "1.0.0",
+  "palette": {
+    "primary": {
+      "default": "#FF8C00",
+      "hover": "#E67E00",
+      "light": "#FFF3E0",
+      "dark": "#CC7000",
+      "contrast": "#FFFFFF"
+    },
+    "nav": {
+      "bg": "#1A2B3A",
+      "foreground": "#FFFFFF",
+      "muted": "#94A3B8"
+    },
+    "neutral": {
+      "background": "#F5F7FA",
+      "surface": "#FFFFFF",
+      "surfaceAlt": "#F8FAFC",
+      "border": "#E2E8F0"
+    },
+    "text": {
+      "main": "#1E293B",
+      "secondary": "#64748B",
+      "muted": "#94A3B8",
+      "inverse": "#FFFFFF"
+    },
+    "semantic": {
+      "success": "#059669",
+      "successBg": "#ECFDF5",
+      "warning": "#D97706",
+      "warningBg": "#FFFBEB",
+      "error": "#DC2626",
+      "errorBg": "#FEF2F2",
+      "info": "#0284C7",
+      "infoBg": "#E0F2FE"
+    }
+  },
+  "spacing": {
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "24px",
+    "6": "32px",
+    "7": "48px",
+    "8": "64px"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "8px",
+    "lg": "12px",
+    "full": "9999px"
+  },
+  "typography": {
+    "fontFamily": "Inter, system-ui, -apple-system, sans-serif",
+    "fontFamilyDisplay": "Geist, Inter, system-ui, sans-serif",
+    "scale": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "1.875rem",
+      "4xl": "2.25rem"
+    },
+    "weight": {
+      "normal": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    }
+  },
+  "shadows": {
+    "sm": "0 1px 2px 0 rgba(15, 23, 42, 0.05)",
+    "md": "0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -2px rgba(15, 23, 42, 0.05)",
+    "lg": "0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05)",
+    "focus": "0 0 0 3px rgba(255, 140, 0, 0.35)"
+  },
+  "breakpoints": {
+    "sm": "640px",
+    "md": "768px",
+    "lg": "1024px",
+    "xl": "1280px",
+    "2xl": "1536px"
+  },
+  "zIndex": {
+    "dropdown": 1000,
+    "sticky": 1020,
+    "fixed": 1030,
+    "modalBackdrop": 1040,
+    "modal": 1050,
+    "toast": 1080
+  }
+}

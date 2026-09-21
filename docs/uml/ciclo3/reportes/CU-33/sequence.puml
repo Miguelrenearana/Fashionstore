@@ -1,0 +1,48 @@
+@startuml CU-33
+actor "Administrador" as Adm
+boundary "«UI» Angular (Admin/Reportes)" as UI
+control "«Controller» API /reports" as Ctrl
+entity "«Model» ReportService / Sale, Inventory, Receipt" as Model
+database "«DB» PostgreSQL (Neon)" as DB
+
+Adm -> UI : Accede a "Reportes e Indicadores"
+UI -> Ctrl : GET /api/v1/reports/indicators?start_date=2024-01-01&end_date=2024-12-31&branch_id=1
+Ctrl -> Model : get_sales_indicators(start_date, end_date, branch_id)
+Model -> DB : Consultas agregadas (SUM, COUNT, AVG) sobre Sale, SaleDetail, Inventory
+Model --> Ctrl : IndicatorsResponse {total_sales, total_revenue, avg_ticket, orders_count, top_branch}
+Ctrl --> UI : IndicatorsResponse
+UI --> Adm : Dashboard KPIs (ventas totales, ticket promedio, pedidos, mejor sucursal)
+
+Adm -> UI : Consulta stock bajo / agotado
+UI -> Ctrl : GET /api/v1/reports/stock?branch_id=1&threshold=10
+Ctrl -> Model : get_stock_indicators(branch_id, threshold)
+Model -> DB : SELECT Inventory WHERE quantity <= threshold GROUP BY branch
+Model --> Ctrl : LowStockResponse {low_stock[], out_of_stock[], summary}
+Ctrl --> UI : LowStockResponse
+UI --> Adm : Lista productos con stock bajo/agotado por sucursal
+
+Adm -> UI : Consulta ventas por período
+UI -> Ctrl : GET /api/v1/reports/sales-by-period?period_type=monthly&start_date=...&end_date=...&branch_id=1
+Ctrl -> Model : get_sales_by_period(period_type, start_date, end_date, branch_id)
+Model -> DB : SELECT DATE_TRUNC('month', created_at), SUM(total_amount) FROM Sale GROUP BY 1
+Model --> Ctrl : SalesByPeriodResponse {periods[], total}
+Ctrl --> UI : SalesByPeriodResponse
+UI --> Adm : Gráfico de ventas por día/semana/mes
+
+Adm -> UI : Consulta top productos
+UI -> Ctrl : GET /api/v1/reports/top-products?start_date=...&end_date=...&limit=10&branch_id=1
+Ctrl -> Model : get_top_products(start_date, end_date, limit, branch_id)
+Model -> DB : SELECT GarmentVariant, SUM(qty) FROM SaleDetail JOIN Sale GROUP BY variant ORDER BY 2 DESC LIMIT ?
+Model --> Ctrl : TopProductsResponse {products[], total}
+Ctrl --> UI : TopProductsResponse
+UI --> Adm : Top 10 productos más vendidos (nombre, cantidad, revenue)
+
+Adm -> UI : Consulta rotación de inventario
+UI -> Ctrl : GET /api/v1/reports/inventory-turnover?start_date=...&end_date=...&branch_id=1
+Ctrl -> Model : get_inventory_turnover(start_date, end_date, branch_id)
+Model -> DB : Cálculo rotación = COGS / Stock promedio
+Model --> Ctrl : InventoryTurnoverResponse {turnover_rate, days_inventory, cogs, avg_stock}
+Ctrl --> UI : InventoryTurnoverResponse
+UI --> Adm : Indicador de rotación (veces/año, días de inventario)
+
+@enduml

@@ -1,10 +1,62 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/ar_fitting/ar_fitting_routes.dart';
+import '../../features/ai/ai_routes.dart';
+import '../../features/auth/auth_routes.dart';
+import '../../features/cart/cart_routes.dart';
+import '../../features/catalog/catalog_routes.dart';
+import '../../features/profile/profile_routes.dart';
+import '../../features/reservations/reservation_routes.dart';
+import '../../shared/widgets/app_shell.dart';
+
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final _catalogKey = GlobalKey<NavigatorState>(debugLabel: 'catalog');
+final _reservationsKey = GlobalKey<NavigatorState>(debugLabel: 'reservations');
+final _cartKey = GlobalKey<NavigatorState>(debugLabel: 'cart');
+final _aiKey = GlobalKey<NavigatorState>(debugLabel: 'ai');
+final _profileKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    routes: ArFittingRoutes.routes,
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/catalog',
+    routes: [
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/catalog',
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return MainShell(child: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _catalogKey,
+            routes: CatalogRoutes.routes,
+          ),
+          StatefulShellBranch(
+            navigatorKey: _reservationsKey,
+            routes: ReservationRoutes.routes,
+          ),
+          StatefulShellBranch(
+            navigatorKey: _cartKey,
+            routes: CartRoutes.routes,
+          ),
+          StatefulShellBranch(
+            navigatorKey: _aiKey,
+            routes: AiRoutes.routes,
+          ),
+          StatefulShellBranch(
+            navigatorKey: _profileKey,
+            routes: ProfileRoutes.routes,
+          ),
+        ],
+      ),
+      // Auth + AR live on the root navigator (no bottom nav).
+      ...AuthRoutes.routes,
+      ...ArFittingRoutes.routes,
+    ],
   );
 });

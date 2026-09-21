@@ -7,9 +7,10 @@ from app.services.inventory_service import inventory_service
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 admin_manager = require_roles("ADMIN", "MANAGER")
+branch_manager = require_roles("ADMIN", "MANAGER", "BRANCH_MANAGER")
 
 
-@router.get("", response_model=list[InventoryRead], dependencies=[Depends(admin_manager)])
+@router.get("", response_model=list[InventoryRead], dependencies=[Depends(branch_manager)])
 def list_inventory(
     db: DbSession,
     branch_id: int,
@@ -21,7 +22,7 @@ def list_inventory(
 @router.get(
     "/movements",
     response_model=list[InventoryMovementRead],
-    dependencies=[Depends(admin_manager)],
+    dependencies=[Depends(branch_manager)],
 )
 def list_movements(
     db: DbSession,
@@ -34,7 +35,7 @@ def list_movements(
 @router.patch(
     "/{branch_id}/{variant_id}/adjust",
     response_model=InventoryRead,
-    dependencies=[Depends(admin_manager)],
+    dependencies=[Depends(branch_manager)],
 )
 def adjust_inventory(db: DbSession, branch_id: int, variant_id: int, payload: InventoryAdjust):
     return inventory_service.adjust(db, branch_id, variant_id, payload)

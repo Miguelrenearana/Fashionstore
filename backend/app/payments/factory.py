@@ -4,6 +4,7 @@ from app.core.config import settings
 from app.core.exceptions import PaymentError
 from app.payments.adapters.mock_gateway import MockGateway
 from app.payments.adapters.pagosnet_gateway import PagosNetGateway
+from app.payments.adapters.static_qr_gateway import StaticQRGateway
 from app.payments.domain.gateway import PaymentGateway
 from app.payments.domain.service import PaymentService
 
@@ -14,6 +15,8 @@ def build_gateway() -> PaymentGateway:
         return MockGateway()
     if selected == "pagosnet":
         return PagosNetGateway()
+    if selected == "static_qr":
+        return StaticQRGateway()
     raise PaymentError(f"Unknown payment gateway: {settings.payment_gateway}")
 
 

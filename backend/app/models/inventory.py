@@ -15,6 +15,7 @@ class Inventory(Base, TimestampMixin):
     reserved_quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     variant = relationship("GarmentVariant", back_populates="inventory")
+    branch = relationship("Branch", back_populates="inventory")
 
     @property
     def available(self) -> int:

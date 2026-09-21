@@ -32,6 +32,7 @@ class Sale(Base, TimestampMixin):
     payments = relationship("Payment", back_populates="sale")
     reservation = relationship("Reservation")
     client = relationship("Client")
+    branch = relationship("Branch", back_populates="sales")
 
 
 class SaleDetail(Base, TimestampMixin):
@@ -65,6 +66,17 @@ class Payment(Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="BOB", nullable=False)
     method: Mapped[str] = mapped_column(String(30), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default=SalePaymentStatus.PENDING, nullable=False)
+    
+    # Static QR Gateway fields
+    qr_payload: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    qr_svg: Mapped[str | None] = mapped_column(String, nullable=True)
+    qr_png_base64: Mapped[str | None] = mapped_column(String, nullable=True)
+    qr_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    qr_webhook_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    qr_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    qr_verification_method: Mapped[str] = mapped_column(String(20), default="polling", nullable=False)  # polling, webhook
+    qr_manually_marked_paid: Mapped[bool] = mapped_column(default=False, nullable=False)
+    qr_webhook_payload: Mapped[str | None] = mapped_column(String, nullable=True)
 
     sale = relationship("Sale", back_populates="payments")
 

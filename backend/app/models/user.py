@@ -62,6 +62,8 @@ class Branch(Base, TimestampMixin, SoftDeleteMixin):
 
     city = relationship("City", back_populates="branches")
     employees = relationship("Employee", back_populates="branch")
+    inventory = relationship("Inventory", back_populates="branch")
+    sales = relationship("Sale", back_populates="branch")
 
 
 class Employee(Base, TimestampMixin, SoftDeleteMixin):

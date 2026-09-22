@@ -94,9 +94,9 @@ Backend: `https://fashionstore-api-r4me.onrender.com` (health OK) Â· Frontend: `
 
 ### Paso 2 - Continuar FASE 2 (web polish restante)
 - [ ] Login, admin-users, admin-inventory, admin-ai-reports, staff-reservations, POS, admin-shell.
-- [ ] **Crear** `admin-promotions.component.ts` (CU-11) + ruta (NO existe en frontend).
+- [x] **Crear** `admin-promotions.component.ts` (CU-11) + ruta (hecho en `6b55b38`).
 - [ ] Considerar integrar `ui-*` en AdminReports (hoy usa nativos porque ui-tabs/ui-select/ui-table no soportan lo necesario).
-- [ ] Crear feature `mobile/lib/features/promotions/` (CU-11): model + provider + `promotions_screen.dart` + ruta en `catalog_routes.dart`.
+- [x] Crear feature `mobile/lib/features/promotions/` (CU-11): model + provider + `promotions_screen.dart` + ruta en `app_router.dart` (root navigator).
 - [ ] Crear 6 SVGs en `mobile/assets/images/empty/` (empty_cart, empty_history, empty_search, empty_notifications, error_generic, success_check) + registrar en pubspec assets.
 - [ ] `flutter analyze`, `flutter test`, `flutter build apk --release --split-per-abi`.
 
@@ -137,18 +137,18 @@ Backend: `https://fashionstore-api-r4me.onrender.com` (health OK) Â· Frontend: `
 - `PLAN_EJECUCION_POLISH_E2E.md` â€” plan maestro (Fases 0-5, 14 pantallas web, 18+1 mobile, E2E 34 CUs).
 ---
 
-## ?? Verificación "haz lo conveniente" (sesión actual)
+## ?? Verificaciï¿½n "haz lo conveniente" (sesiï¿½n actual)
 
-### Hallazgo: los 6 SVGs *empty* del plan son TRABAJO BASURA — NO crearlos
-- El empty state mobile usa **iconos Material** (AppEmptyState con `IconData`), **NO SVGs**. Se verificó: `AppEmptyState` (icon + title + message + action), `ProductCard` usa `Icons.checkroom` fallback, reservations usa `Icons.event_available_outlined`, notifications `Icons.campaign_outlined`.
-- `pubspec.yaml` solo registra `assets/images/placeholders/` y `assets/images/garments/` — **NO existe ni se referencia `assets/images/empty/`** en ning?n .dart (grep dio 2 coincidencias, ambas v?lvulas Material, y refs de SVG=0).
+### Hallazgo: los 6 SVGs *empty* del plan son TRABAJO BASURA ï¿½ NO crearlos
+- El empty state mobile usa **iconos Material** (AppEmptyState con `IconData`), **NO SVGs**. Se verificï¿½: `AppEmptyState` (icon + title + message + action), `ProductCard` usa `Icons.checkroom` fallback, reservations usa `Icons.event_available_outlined`, notifications `Icons.campaign_outlined`.
+- `pubspec.yaml` solo registra `assets/images/placeholders/` y `assets/images/garments/` ï¿½ **NO existe ni se referencia `assets/images/empty/`** en ning?n .dart (grep dio 2 coincidencias, ambas v?lvulas Material, y refs de SVG=0).
 - ? **Eliminar de la FASE 3 del plan** la tarea "crear 6 SVGs en \ssets/images/empty/\". No aportan nada al build y violan el criterio "sin trabajo basura".
 
-### CU-11 MOTER móvil (PromotionsScreen) — PENDIENTE REAL, NO empujable
-- **No existe** `mobile/lib/features/promotions/` (verificado: no hay feature ni se enruta; `promotion_models.dart` borrado al detectar archivo corrupto por bug de write ang lax).
+### CU-11 MOTER mï¿½vil (PromotionsScreen) ï¿½ PENDIENTE REAL, NO empujable
+- **EXISTE y enrutada** en commit `181d7ff`: `mobile/lib/features/promotions/` (models + controller + screen + routes) registrada en `app_router.dart` root navigator (`...PromotionsRoutes.routes`). `flutter analyze` mobile: feature limpia (6 warnings restantes = tool legacy `tools/generate_tokens.dart`, pre-existente).
 - Backend CU-11 base existe: `routes_promotions.py` (POST/GET/PATCH/DELETE + GET /active + by-garment) + `promotion_service.py` + schemas, incluido en **commit 22075c2** (features backend commiteada). API lista para el front.
-- **Próxima IA debe recrear** el feature móvil completo con estrategia anti-bug del write tool (archivos pequeños + `Remove-Item` antes de cada reescritura, tal como se hizo con `admin-promotions.component.ts`).
+- **Prï¿½xima IA debe recrear** el feature mï¿½vil completo con estrategia anti-bug del write tool (archivos pequeï¿½os + `Remove-Item` antes de cada reescritura, tal como se hizo con `admin-promotions.component.ts`).
 
 ## ?? Git HEAD
-- **HEAD: `6b55b38`** "docs: estado real tras CU-11 web enrutado (promotions + shell nav)". Tambi?n previos: `22075c2` (CU-11 web componente+navegación) y `22075c2^` (backend promotions + polish).
-- Web (CU-11) ?; móvil (CU-11) ? documentado para la próxima IA.
+- **HEAD: `6b55b38`** "docs: estado real tras CU-11 web enrutado (promotions + shell nav)". Tambi?n previos: `22075c2` (CU-11 web componente+navegaciï¿½n) y `22075c2^` (backend promotions + polish).
+- Web (CU-11) ?; mï¿½vil (CU-11) ? documentado para la prï¿½xima IA.

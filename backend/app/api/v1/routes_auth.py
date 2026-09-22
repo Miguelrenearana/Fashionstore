@@ -25,6 +25,7 @@ class LoginResponse(TokenResponse):
 def login(db: DbSession, form: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = auth_service.authenticate(db, form.username, form.password)
     token = auth_service.issue_token(user)
+    roles = user.role_names()
     return LoginResponse(
         access_token=token,
         token_type="bearer",
@@ -32,7 +33,7 @@ def login(db: DbSession, form: Annotated[OAuth2PasswordRequestForm, Depends()]):
             "id": user.id,
             "email": user.email,
             "full_name": user.full_name if hasattr(user, 'full_name') else user.email,
-            "role": user.role_names()[0] if user.role_names() else "client",
+            "role": next(iter(roles)) if roles else "client",
         },
     )
 

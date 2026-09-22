@@ -41,8 +41,17 @@ class ReservationController extends StateNotifier<ReservationState> {
   Future<void> load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await _api.get('/reservations/me');
-      final reservations = (res['items'] as List? ?? const [])
+      final dynamic res = await _api.get('/reservations/me');
+      // Backend returns list directly, not wrapped in {items: [...]}
+      final List<dynamic> data;
+      if (res is List) {
+        data = List<dynamic>.from(res);
+      } else if (res is Map && res['items'] is List) {
+        data = List<dynamic>.from(res['items'] as List);
+      } else {
+        data = const [];
+      }
+      final reservations = data
           .map((e) => Reservation.fromJson(e as Map<String, dynamic>))
           .toList();
       state = state.copyWith(reservations: reservations, isLoading: false);
@@ -53,7 +62,7 @@ class ReservationController extends StateNotifier<ReservationState> {
 
   Future<void> create({
     required List<Map<String, dynamic>> items,
-    String? branchId,
+    int? branchId,
   }) async {
     await _api.post('/reservations', data: {
       'items': items,

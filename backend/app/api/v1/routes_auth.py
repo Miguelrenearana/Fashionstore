@@ -12,15 +12,29 @@ from app.schemas.auth import (
 from app.schemas.client import ClientRegister
 from app.schemas.common import Message
 from app.services.auth_service import auth_service
+from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenResponse)
+class LoginResponse(TokenResponse):
+    user: dict
+
+
+@router.post("/login", response_model=LoginResponse)
 def login(db: DbSession, form: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = auth_service.authenticate(db, form.username, form.password)
     token = auth_service.issue_token(user)
-    return TokenResponse(access_token=token)
+    return LoginResponse(
+        access_token=token,
+        token_type="bearer",
+        user={
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name if hasattr(user, 'full_name') else user.email,
+            "role": user.role_names()[0] if user.role_names() else "client",
+        },
+    )
 
 
 @router.post("/logout", response_model=Message)

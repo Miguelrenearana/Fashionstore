@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/ar_fitting/ar_fitting_routes.dart';
 import '../../features/ai/ai_routes.dart';
+import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_routes.dart';
 import '../../features/cart/cart_routes.dart';
 import '../../features/catalog/catalog_routes.dart';
@@ -20,9 +21,35 @@ final _aiKey = GlobalKey<NavigatorState>(debugLabel: 'ai');
 final _profileKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final authNotifier = ref.watch(authNotifierProvider);
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/catalog',
+    initialLocation: '/auth/login',
+    refreshListenable: authNotifier,
+    redirect: (context, state) {
+      final isLoggedIn = authNotifier.isAuthenticated;
+      final isAuthRoute = state.matchedLocation.startsWith('/auth/');
+      final isArRoute = state.matchedLocation.startsWith('/ar/');
+      final isPromoRoute = state.matchedLocation.startsWith('/promotions');
+
+      // Allow access to auth, AR, and promotions routes without login
+      if (isAuthRoute || isArRoute || isPromoRoute) {
+        return null;
+      }
+
+      // If not logged in and trying to access protected routes, redirect to login
+      if (!isLoggedIn) {
+        return '/auth/login';
+      }
+
+      // If logged in and on login page, redirect to catalog
+      if (isLoggedIn && isAuthRoute) {
+        return '/catalog';
+      }
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/',

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/di/providers.dart';
@@ -37,8 +38,8 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> _restoreSession() async {
     if (await _api.hasSession()) {
       try {
-        final res = await _api.get('/auth/me');
-        state = state.copyWith(user: User.fromJson(res['user'] as Map<String, dynamic>));
+        final res = await _api.get('/users/me');
+        state = state.copyWith(user: User.fromJson(res as Map<String, dynamic>));
       } catch (_) {
         await _api.clearSession();
       }
@@ -52,19 +53,27 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final form = FormData.fromMap({'username': email, 'password': password});
-      final res = await _api.post('/auth/token', data: form);
-      final session = AuthSession(
-        accessToken: (res['access_token'] ?? res['token']) as String,
+      final res = await _api.post('/auth/login', data: form);
+      final accessToken = (res['access_token'] ?? res['token']) as String;
+      
+      // Guardar token PRIMERO para que el interceptor lo use en /users/me
+      await _api.saveSession(AuthSession(
+        accessToken: accessToken,
         refreshToken: res['refresh_token'] as String?,
-        user: User(
-          id: (res['user']?['id'] ?? 0) as int,
-          email: email,
-          fullName: (res['user']?['full_name'] ?? email) as String,
-          role: (res['user']?['role'] ?? 'client') as String,
-        ),
-      );
-      await _api.saveSession(session);
-      state = state.copyWith(user: session.user, isLoading: false);
+        user: User(id: 0, email: email, fullName: '', role: 'client'),
+      ));
+      
+      // Ahora obtener datos del usuario (el interceptor ya enviará el token)
+      final userRes = await _api.get('/users/me');
+      final user = User.fromJson(userRes as Map<String, dynamic>);
+      
+      // Actualizar sesión con datos reales del usuario
+      await _api.saveSession(AuthSession(
+        accessToken: accessToken,
+        refreshToken: res['refresh_token'] as String?,
+        user: user,
+      ));
+      state = state.copyWith(user: user, isLoading: false);
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
       rethrow;
@@ -112,4 +121,23 @@ class AuthController extends StateNotifier<AuthState> {
 final authControllerProvider =
     StateNotifierProvider<AuthController, AuthState>((ref) {
   return AuthController(ref.watch(apiClientProvider));
+});
+
+/// Wrapper que expone el estado de autenticación como [Listenable] para GoRouter
+class AuthNotifier extends ChangeNotifier {
+  AuthNotifier(this._ref) {
+    _ref.listen<AuthState>(authControllerProvider, (_, next) {
+      notifyListeners();
+    });
+  }
+
+  final Ref _ref;
+
+  AuthState get state => _ref.read(authControllerProvider);
+
+  bool get isAuthenticated => state.isAuthenticated;
+}
+
+final authNotifierProvider = Provider<AuthNotifier>((ref) {
+  return AuthNotifier(ref);
 });

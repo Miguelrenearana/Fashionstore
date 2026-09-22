@@ -56,7 +56,7 @@ class ChatController extends StateNotifier<ChatState> {
             .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
             .toList(),
       });
-      final reply = (res['reply'] ?? res['response'] ?? '') as String;
+      final reply = (res['message'] ?? res['reply'] ?? res['response'] ?? '') as String;
       state = ChatState(
         messages: [
           ...state.messages.where((m) => !m.isTyping),

@@ -41,6 +41,7 @@ class UserRead(ORMModel):
     is_active: bool
     is_verified: bool
     roles: list[RoleRead] = []
+    full_name: str | None = None
 
 
 class UserCreate(BaseModel):

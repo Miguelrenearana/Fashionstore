@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/design/design.dart';
+import '../../core/di/providers.dart';
 import '../../core/models/catalog.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../reservations/reservation_controller.dart';
 import 'catalog_controller.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
@@ -232,24 +234,38 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 top: Radius.circular(AppRadius.lg),
               ),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: AppButton(
-                    label: 'Agregar al carrito',
-                    variant: AppButtonVariant.secondary,
-                    icon: Icons.add_shopping_cart,
-                    onPressed: () {
-                      AppToast.show(
-                        context,
-                        message: 'Agregado al carrito',
-                        type: ToastType.success,
-                      );
-                      context.go('/cart');
-                    },
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Reservar',
+                        variant: AppButtonVariant.secondary,
+                        icon: Icons.event_available_outlined,
+                        onPressed: _showReserveSheet,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.x3),
+                    Expanded(
+                      child: AppButton(
+                        label: 'Agregar al carrito',
+                        variant: AppButtonVariant.secondary,
+                        icon: Icons.add_shopping_cart,
+                        onPressed: () {
+                          AppToast.show(
+                            context,
+                            message: 'Agregado al carrito',
+                            type: ToastType.success,
+                          );
+                          context.go('/cart');
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.x3),
+                const SizedBox(height: AppSpacing.x3),
                 AppButton(
                   label: 'Probar en AR',
                   icon: Icons.auto_awesome,
@@ -272,6 +288,139 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showReserveSheet() async {
+    final product = _product;
+    if (product == null || product.variants.isEmpty) return;
+    final variant = product.variants.firstWhere(
+      (v) =>
+          v.size.name ==
+              (_selectedSize ?? product.variants.first.size.name) &&
+          v.color.name ==
+              (_selectedColor ?? product.variants.first.color.name),
+      orElse: () => product.variants.first,
+    );
+
+    final branchFuture = ref.read(apiClientProvider).get('/locations/branches');
+    final branchesData = await branchFuture;
+    final branches = (branchesData['items'] as List? ?? branchesData as List?)
+            ?.map((e) => {
+                  'id': e['id'] as int,
+                  'name': e['name'] as String? ?? 'Sucursal',
+                })
+            .toList() ??
+        const [];
+
+    if (!mounted || branches.isEmpty) return;
+
+    int? selectedBranchId = branches.first['id'] as int;
+    int reserveQuantity = 1;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+            ),
+            padding: const EdgeInsets.all(AppSpacing.x5),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Reservar en tienda',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.x3),
+                Text(
+                  '${product.name} — ${variant.size.name} / ${variant.color.name}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.x4),
+                Text('Sucursal', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: AppSpacing.x2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      isExpanded: true,
+                      value: selectedBranchId,
+                      items: branches
+                          .map((b) => DropdownMenuItem<int>(
+                                value: b['id'] as int,
+                                child: Text(b['name'] as String),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setSheetState(() => selectedBranchId = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.x4),
+                _QuantityStepper(
+                  quantity: reserveQuantity,
+                  onChanged: (v) => setSheetState(() => reserveQuantity = v),
+                ),
+                const SizedBox(height: AppSpacing.x5),
+                SizedBox(
+                  width: double.infinity,
+                  child: AppButton(
+                    label: 'Confirmar reserva',
+                    icon: Icons.check_circle_outline,
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await ref
+                            .read(reservationControllerProvider.notifier)
+                            .create(
+                              items: [
+                                {'variant_id': variant.id, 'quantity': reserveQuantity}
+                              ],
+                              branchId: selectedBranchId,
+                            );
+                        if (mounted) {
+                          AppToast.show(context,
+                              message: 'Reserva creada', type: ToastType.success);
+                          context.go('/reservations');
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          AppToast.show(context,
+                              message: 'Error: ${e.toString()}', type: ToastType.error);
+                        }
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.x3),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

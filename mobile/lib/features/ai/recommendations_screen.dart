@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/design/design.dart';
 import '../../core/models/models.dart';
@@ -44,14 +45,24 @@ class RecommendationsController extends StateNotifier<RecommendationsState> {
   Future<void> load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await _api.get('/ai/recommendations');
-      final items = (res['items'] as List? ?? const [])
+      // Use trending as default source to avoid "Variant not found" error
+      final dynamic res = await _api.get('/ai/recommendations?source=trending&limit=10');
+      // Backend returns list directly, not wrapped in {items: [...]}
+      final List<dynamic> data;
+      if (res is List) {
+        data = List<dynamic>.from(res);
+      } else if (res is Map && res['items'] is List) {
+        data = List<dynamic>.from(res['items'] as List);
+      } else {
+        data = const [];
+      }
+      final items = data
           .map((e) => ProductRecommendation.fromJson(e as Map<String, dynamic>))
           .toList();
       state = state.copyWith(
         items: items,
         isLoading: false,
-        reason: res['reason'] as String?,
+        reason: res is Map ? res['reason'] as String? : null,
       );
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
@@ -100,6 +111,13 @@ class _RecommendationsScreenState
             Text('Recomendados para ti'),
           ],
         ),
+        actions: [
+          IconButton(
+            onPressed: () => context.go('/ai/chat'),
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Asistente IA',
+          ),
+        ],
       ),
       body: state.error != null && state.items.isEmpty
           ? AppEmptyState(

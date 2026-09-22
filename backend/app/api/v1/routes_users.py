@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import CurrentUser, DbSession, require_roles
+from app.models.user import Client
 from app.schemas.user import (
     EmployeeCreate,
     EmployeeRead,
@@ -28,8 +29,18 @@ def list_users(db: DbSession, page: int = 1, size: int = 20):
 
 
 @router.get("/me", response_model=UserRead)
-def me(current: CurrentUser):
-    return current
+def me(db: DbSession, current: CurrentUser):
+    client = db.query(Client).filter(Client.user_id == current.id).first()
+    full_name = f"{client.first_name} {client.last_name}" if client else None
+    return UserRead(
+        id=current.id,
+        email=current.email,
+        phone=current.phone,
+        is_active=current.is_active,
+        is_verified=current.is_verified,
+        roles=current.roles,
+        full_name=full_name,
+    )
 
 
 @router.post("", response_model=UserRead, dependencies=[Depends(admin_only)])

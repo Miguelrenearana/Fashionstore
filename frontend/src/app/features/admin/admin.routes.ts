@@ -6,6 +6,7 @@ import { AdminProductsComponent } from './admin-products.component';
 import { AdminInventoryComponent } from './admin-inventory.component';
 import { AdminReportsComponent } from './admin-reports.component';
 import { AdminAiReportsComponent } from './admin-ai-reports.component';
+import { AdminPromotionsComponent } from './admin-promotions.component';
 
 export const ADMIN_ROUTES: Routes = [
   {
@@ -17,6 +18,7 @@ export const ADMIN_ROUTES: Routes = [
       { path: 'catalog', component: AdminCatalogConfigComponent },
       { path: 'products', component: AdminProductsComponent },
       { path: 'inventory', component: AdminInventoryComponent },
+      { path: 'promotions', component: AdminPromotionsComponent },
       { path: 'reports', component: AdminReportsComponent },
       { path: 'reports/ai', component: AdminAiReportsComponent },
     ],

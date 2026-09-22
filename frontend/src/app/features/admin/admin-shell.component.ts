@@ -15,6 +15,7 @@ import { AuthService } from '@core/auth/auth.service';
           <a routerLink="catalog" routerLinkActive="active" class="nav-link">Catálogo (tallas, colores…)</a>
           <a routerLink="products" routerLinkActive="active" class="nav-link">Productos</a>
           <a routerLink="inventory" routerLinkActive="active" class="nav-link">Inventario</a>
+          <a routerLink="promotions" routerLinkActive="active" class="nav-link">Promociones (CU-11)</a>
           <a routerLink="reports" routerLinkActive="active" class="nav-link">Reportes</a>
           <a routerLink="reports/ai" routerLinkActive="active" class="nav-link">Reportes IA</a>
         </nav>

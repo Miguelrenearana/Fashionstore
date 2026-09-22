@@ -8,20 +8,19 @@ Tests cover:
 - Refund processing
 - Status polling
 """
+import hashlib
+import hmac
 import json
 import uuid
-import hmac
-import hashlib
-from decimal import Decimal
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.payments.adapters.static_qr_gateway import StaticQRGateway, _pending_auto_complete
-from app.models.sales import Payment, Sale, SaleStatus, SalePaymentStatus, Receipt
-from app.models.user import Client
+from app.models.sales import Payment, Receipt, Sale
+from app.payments.adapters.static_qr_gateway import _pending_auto_complete
 
 
 class TestCU25PaymentStaticQR:
@@ -96,7 +95,7 @@ class TestCU25PaymentStaticQR:
         )
         assert r.status_code == 200, r.text
         data = r.json()
-        
+
         # Verify response structure (PaymentRead schema)
         assert "gateway_reference" in data
         assert data["gateway_reference"].startswith("QR_FS_")
@@ -135,7 +134,7 @@ class TestCU25PaymentStaticQR:
 
         # Send webhook to complete payment
         payload = {"reference": reference, "status": "COMPLETED", "amount": 150.00}
-        
+
         r = self._make_webhook_request(client, payload)
         assert r.status_code == 200, r.text
         assert r.json()["success"] is True
@@ -278,7 +277,7 @@ class TestCU25PaymentStaticQR:
         try:
             payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
             assert payment.status == "REFUNDED"
-            
+
             # Sale should be REFUNDED
             sale = db.query(Sale).filter(Sale.id == payment.sale_id).first()
             assert sale.status == "REFUNDED"
@@ -296,7 +295,7 @@ class TestCU25PaymentStaticQR:
         """Test status polling endpoint."""
         # Disable auto-complete for this test by setting a very large timeout
         monkeypatch.setattr(settings, "static_qr_auto_complete_seconds", 3600)  # 1 hour
-        
+
         sale_id = self._create_sale(Decimal("150.00"))
 
         db = SessionLocal()
@@ -360,7 +359,7 @@ class TestCU25PaymentStaticQR:
         # Send webhook twice
         payload = {"reference": reference, "status": "COMPLETED", "amount": 150.00}
         signature = self._sign_payload(payload)
-        
+
         for _ in range(2):
             r = self._make_webhook_request(client, payload)
             assert r.status_code == 200
@@ -434,21 +433,22 @@ class TestCU25PaymentStaticQR:
     def test_payment_init_request_schema(self):
         """Test PaymentInitRequest schema validation."""
         from app.schemas.payment import PaymentInitRequest
-        
+
         # Valid request
         req = PaymentInitRequest(sale_id=1, method="static_qr")
         assert req.sale_id == 1
         assert req.method == "static_qr"
-        
+
         # Invalid method
         with pytest.raises(Exception):
             PaymentInitRequest(sale_id=1, method="invalid_method")
 
     def test_payment_init_response_schema(self):
         """Test PaymentInitResponse schema."""
+        from datetime import UTC, datetime
+
         from app.schemas.payment import PaymentInitResponse
-        from datetime import datetime, UTC
-        
+
         resp = PaymentInitResponse(
             reference="QR_FS_TEST123",
             status="PENDING",

@@ -5,18 +5,16 @@ CU-33: Indicadores de ventas y stock.
 CU-35: Reporte consolidado de ventas e inventario.
 CU-34: Bitácora de auditoría (delegado al AuditService).
 """
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import List, Optional
 
-from sqlalchemy import func, desc, case
+from sqlalchemy import desc, func
 
 from app.core.dependencies import DbSession
+from app.models.catalog import GarmentVariant
 from app.models.inventory import Inventory
-from app.models.catalog import GarmentVariant, Garment
 from app.models.sales import Sale, SaleDetail, SaleStatus
 from app.models.user import Branch
-from app.models.analytics import AuditLog
 
 
 class ReportService:
@@ -32,7 +30,7 @@ class ReportService:
     # ------------------------------------------------------------------
     # CU-33: Indicadores de ventas
     # ------------------------------------------------------------------
-    def get_sales_indicators(self, start_date: datetime, end_date: datetime, branch_id: Optional[int] = None) -> dict:
+    def get_sales_indicators(self, start_date: datetime, end_date: datetime, branch_id: int | None = None) -> dict:
         """Obtener indicadores de ventas para el período."""
         q = self.db.query(Sale).filter(
             Sale.status == SaleStatus.PAID,
@@ -113,7 +111,7 @@ class ReportService:
     # ------------------------------------------------------------------
     # CU-33: Indicadores de stock
     # ------------------------------------------------------------------
-    def get_stock_indicators(self, branch_id: Optional[int] = None, threshold: int = 10) -> dict:
+    def get_stock_indicators(self, branch_id: int | None = None, threshold: int = 10) -> dict:
         """Obtener indicadores de stock bajo y agotado."""
         q = self.db.query(Inventory)
         if branch_id:
@@ -167,9 +165,9 @@ class ReportService:
     def get_sales_by_period(
         self,
         period_type: str = "daily",
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        branch_id: Optional[int] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        branch_id: int | None = None,
     ) -> dict:
         """Obtener ventas agrupadas por período."""
         q = self.db.query(
@@ -229,7 +227,7 @@ class ReportService:
         start_date: datetime,
         end_date: datetime,
         limit: int = 10,
-        branch_id: Optional[int] = None,
+        branch_id: int | None = None,
     ) -> dict:
         """Obtener productos más vendidos."""
         q = (
@@ -284,7 +282,7 @@ class ReportService:
     # ------------------------------------------------------------------
     # CU-33: Productos con stock bajo
     # ------------------------------------------------------------------
-    def get_low_stock(self, branch_id: Optional[int] = None, threshold: int = 10) -> dict:
+    def get_low_stock(self, branch_id: int | None = None, threshold: int = 10) -> dict:
         """Obtener productos con stock bajo o agotado."""
         return self.get_stock_indicators(branch_id, threshold)
 
@@ -295,7 +293,7 @@ class ReportService:
         self,
         start_date: datetime,
         end_date: datetime,
-        branch_id: Optional[int] = None,
+        branch_id: int | None = None,
     ) -> dict:
         """Obtener rotación de inventario por variante."""
         q = self.db.query(Inventory)
@@ -354,7 +352,7 @@ class ReportService:
         self,
         start_date: datetime,
         end_date: datetime,
-        branch_id: Optional[int] = None,
+        branch_id: int | None = None,
     ) -> dict:
         """Obtener reporte consolidado de ventas e inventario."""
         sales_q = (

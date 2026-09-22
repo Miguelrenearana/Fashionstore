@@ -1,129 +1,128 @@
-import { Component, inject, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, inject, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
+import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { environment } from '@core/environments/environment';
+import { UiButtonComponent } from '@shared/ui/button';
+import { UiInputComponent } from '@shared/ui/input';
+import { UiSelectComponent } from '@shared/ui/select';
+import { UiTableComponent } from '@shared/ui/table';
+import { UiCardComponent } from '@shared/ui/card';
+
+interface Product {
+  id: number;
+  name: string;
+  base_price: number;
+  category_id: number;
+  category_name?: string;
+  is_ar_enabled: boolean;
+  is_active: boolean;
+}
+
+interface Category {
+  id: number;
+  name: string;
+}
 
 @Component({
   selector: 'app-admin-products',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    UiButtonComponent,
+    UiInputComponent,
+    UiSelectComponent,
+    UiTableComponent,
+    UiCardComponent,
+  ],
   template: `
-    <section class="products">
-      <h2>Productos (CU-07)</h2>
+    <section class="products container py-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-semibold">Productos (CU-07)</h2>
+        <ui-button variant="primary" (click)="showCreateForm = true" size="md">
+          + Nueva prenda
+        </ui-button>
+      </div>
 
       @if (error) {
-        <p class="error">{{ error }}</p>
+        <div class="alert alert-error mb-4">{{ error }}</div>
       }
 
-      <form class="card" (ngSubmit)="createProduct()">
-        <h3>Nueva prenda</h3>
-        <select [(ngModel)]="newProduct.category_id" name="prod_cat" required>
-          <option [ngValue]="0" disabled>Categoría...</option>
-          @for (c of categories; track c.id) {
-            <option [ngValue]="c.id">{{ c.name }}</option>
-          }
-        </select>
-        <input [(ngModel)]="newProduct.name" name="prod_name" placeholder="Nombre de la prenda" required />
-        <input [(ngModel)]="newProduct.base_price" name="prod_price" type="number" step="0.01" min="0" required />
-        <label class="chip">
-          <input type="checkbox" [(ngModel)]="newProduct.is_ar_enabled" name="prod_ar" />
-          AR habilitado
-        </label>
-        <button type="submit" [disabled]="loading">Agregar</button>
-      </form>
-      <section class="card">
-        <h3>Listado de prendas ({{ products.length }})</h3>
-        <table>
-          <thead>
-            <tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Precio base</th><th>AR</th><th>Activo</th><th></th></tr>
-          </thead>
-          <tbody>
-            @for (p of products; track p.id) {
-              <tr>
-                <td>{{ p.id }}</td>
-                <td><input [(ngModel)]="p.name" name="p_name_{{ p.id }}" placeholder="Nombre" /></td>
-                <td>{{ p.category_name || p.category?.name || '-' }}</td>
-                <td><input [(ngModel)]="p.base_price" name="p_price_{{ p.id }}" type="number" step="0.01" /></td>
-                <td>{{ p.is_ar_enabled ? 'Sí' : 'No' }}</td>
-                <td>{{ p.is_active ? 'Sí' : 'No' }}</td>
-                <td class="inline">
-                  <button (click)="saveProduct(p)" [disabled]="loading">Guardar</button>
-                  <button (click)="toggleProductActive(p)" [disabled]="loading">Activar/Desactivar</button>
-                  <button class="danger" (click)="deleteProduct(p.id)" [disabled]="loading">Eliminar</button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </section>
+      @if (showCreateForm) {
+        <ui-card class="mb-6 p-4">
+          <h3 class="text-lg font-semibold mb-4">Nueva prenda</h3>
+          <form (ngSubmit)="createProduct()" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <ui-select
+              [options]="categoryOptions()"
+              [(ngModel)]="newProduct.category_id"
+              name="prod_cat"
+              [required]="true"
+              placeholder="Categoría..."
+              label="Categoría"
+            />
+            <ui-input
+              label="Nombre"
+              placeholder="Nombre de la prenda"
+              [(ngModel)]="newProduct.name"
+              name="prod_name"
+              required
+            />
+            <ui-input
+              label="Precio base"
+              type="number"
+              step="0.01"
+              min="0"
+              [(ngModel)]="newProduct.base_price"
+              name="prod_price"
+              required
+            />
+            <div class="md:col-span-4 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="prod_ar"
+                [(ngModel)]="newProduct.is_ar_enabled"
+                name="prod_ar"
+                class="form-checkbox"
+              />
+              <label for="prod_ar" class="text-sm">AR habilitado</label>
+            </div>
+            <div class="md:col-span-4 flex justify-end gap-2 pt-2">
+              <ui-button variant="secondary" type="button" (click)="showCreateForm = false">
+                Cancelar
+              </ui-button>
+              <ui-button variant="primary" type="submit" [disabled]="loading" [loading]="loading">
+                {{ loading ? 'Guardando...' : 'Agregar' }}
+              </ui-button>
+            </div>
+          </form>
+        </ui-card>
+      }
+
+      <ui-card class="mb-6">
+        <div class="card-header flex justify-between items-center">
+          <h3 class="text-lg font-semibold">Listado de prendas ({{ products.length }})</h3>
+        </div>
+        <ui-table
+          [columns]="tableColumns"
+          [items]="products"
+          [trackByItem]="trackById"
+          emptyMessage="No hay productos"
+        />
+      </ui-card>
     </section>
   `,
-  styles: [
-    `
-      .products {
-        max-width: 960px;
-      }
-      .card {
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-      }
-      .card input,
-      .card select {
-        display: block;
-        margin-bottom: 0.5rem;
-        padding: 0.4rem;
-        width: 100%;
-        box-sizing: border-box;
-      }
-      .chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        margin-bottom: 0.5rem;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.9rem;
-      }
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 0.4rem 0.6rem;
-        text-align: left;
-      }
-      .inline {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-      }
-      .inline input,
-      .inline select {
-        padding: 0.35rem;
-      }
-      button {
-        cursor: pointer;
-      }
-      .danger {
-        color: #b00020;
-      }
-      .error {
-        color: #b00020;
-      }
-    `,
-  ],
+  styles: []
 })
 export class AdminProductsComponent implements OnInit {
   private auth = inject(AuthService);
 
   error = '';
   loading = false;
-  products: any[] = [];
-  categories: { id: number; name: string }[] = [];
+  showCreateForm = false;
+
+  products: Product[] = [];
+  categories: Category[] = [];
 
   newProduct = {
     category_id: 1,
@@ -131,6 +130,24 @@ export class AdminProductsComponent implements OnInit {
     base_price: 0,
     is_ar_enabled: false,
   };
+
+  trackById = (_: number, item: Product) => item.id;
+
+  categoryOptions = computed(() => 
+    this.categories.map(c => ({ value: String(c.id), label: c.name }))
+  );
+
+  tableColumns = [
+    { header: 'ID', property: 'id', cellSelector: '.id' },
+    { header: 'Nombre', property: 'name', cellSelector: '.name' },
+    { header: 'Categoría', property: 'category_name', cellSelector: '.category' },
+    { header: 'Precio base', property: 'base_price', cellSelector: '.price' },
+    { header: 'AR', property: 'is_ar_enabled', cellSelector: '.ar' },
+    { header: 'Activo', property: 'is_active', cellSelector: '.active' },
+    { header: 'Acciones', property: 'actions', cellSelector: '.actions' },
+  ];
+
+  constructor() {}
 
   ngOnInit(): void {
     this.loadProducts();
@@ -183,13 +200,14 @@ export class AdminProductsComponent implements OnInit {
       })
       .then(() => {
         this.newProduct = { category_id: 1, name: '', base_price: 0, is_ar_enabled: false };
+        this.showCreateForm = false;
         this.loadProducts();
       })
       .catch((e) => (this.error = `No se pudo crear el producto: ${e}`))
       .finally(() => (this.loading = false));
   }
 
-  saveProduct(p: any): void {
+  saveProduct(p: Product): void {
     this.loading = true;
     this.api(`/products/${p.id}`, {
       method: 'PATCH',
@@ -208,7 +226,7 @@ export class AdminProductsComponent implements OnInit {
       .finally(() => (this.loading = false));
   }
 
-  toggleProductActive(p: any): void {
+  toggleProductActive(p: Product): void {
     this.loading = true;
     this.api(`/products/${p.id}`, {
       method: 'PATCH',

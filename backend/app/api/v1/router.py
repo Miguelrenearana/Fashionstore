@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.routes_ai import router as ai_router
 from app.api.v1.routes_auth import router as auth_router
 from app.api.v1.routes_cart import router as cart_router
 from app.api.v1.routes_catalog import router as catalog_router
@@ -19,7 +20,6 @@ from app.api.v1.routes_reservations import router as reservations_router
 from app.api.v1.routes_sales import router as sales_router
 from app.api.v1.routes_suppliers import router as suppliers_router
 from app.api.v1.routes_users import router as users_router
-from app.api.v1.routes_ai import router as ai_router
 from app.payments.api.v1.payments import router as payments_router
 
 api_router = APIRouter()

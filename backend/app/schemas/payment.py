@@ -1,6 +1,4 @@
 from datetime import datetime
-from decimal import Decimal
-from typing import Optional, Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,16 +31,16 @@ class PaymentConfirm(BaseModel):
 class PaymentInitRequest(BaseModel):
     sale_id: int = Field(gt=0)
     method: str = Field(default="static_qr", pattern="^(mock|static_qr|pagosnet|ebanx|card|cash)$")
-    gateway: Optional[str] = None
+    gateway: str | None = None
 
 
 class PaymentInitResponse(BaseModel):
     reference: str
     status: str
-    payment_url: Optional[str] = None
-    qr_svg_url: Optional[str] = None
-    payment_page_url: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    payment_url: str | None = None
+    qr_svg_url: str | None = None
+    payment_page_url: str | None = None
+    expires_at: datetime | None = None
     raw: dict = {}
 
 
@@ -55,11 +53,11 @@ class PaymentStatusResponse(BaseModel):
     status: str
     amount: float
     currency: str
-    verified_at: Optional[datetime] = None
-    verification_method: Optional[str] = None
+    verified_at: datetime | None = None
+    verification_method: str | None = None
 
 
 class PaymentRefundRequest(BaseModel):
     gateway_reference: str
-    amount: Optional[float] = None
-    reason: Optional[str] = None
+    amount: float | None = None
+    reason: str | None = None

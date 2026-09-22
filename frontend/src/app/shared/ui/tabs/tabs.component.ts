@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -8,7 +8,7 @@ import { CommonModule } from '@angular/common';
   template: `
     <div class="tabs">
       @for (tab of tabs(); track tab.id) {
-        <button class="tab" (click)="selectTab(tab.id)">{{ tab.label }}</button>
+        <button class="tab" [class.active]="selected() === tab.id" (click)="selectTab(tab.id)">{{ tab.label }}</button>
       }
     </div>
     <div class="tab-panel">
@@ -48,9 +48,10 @@ import { CommonModule } from '@angular/common';
 })
 export class UiTabsComponent {
   tabs = input<Array<{label: string, id: string}>>([]);
-  selected = output<string>();
+  selected = input<string>('');
+  selectedChange = output<string>();
 
   selectTab(id: string) {
-    this.selected.emit(id);
+    this.selectedChange.emit(id);
   }
 }

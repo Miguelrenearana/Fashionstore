@@ -1,24 +1,14 @@
-import json
-import os
 import httpx
-from typing import Optional, List
-from decimal import Decimal
-from datetime import UTC, datetime
-
+from sqlalchemy import desc, func, text
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func, desc
 
+from app.core.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
+from app.ml.embeddings import EmbeddingService
 from app.ml.recommender import RecommenderService
 from app.ml.vector_store import VectorStore
-from app.ml.embeddings import EmbeddingService
 from app.models.analytics import BrowsingHistory, Recommendation
-from app.models.catalog import Garment, GarmentVariant
-from app.models.sales import Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail
-from app.models.user import Client
-from app.core.config import settings
+from app.models.catalog import GarmentVariant
 
 
 class AIService:
@@ -85,10 +75,10 @@ class AIService:
         variant = db.get(GarmentVariant, variant_id)
         if not variant:
             raise NotFoundError("Variant not found.")
-        
+
         # Usar el recomendador existente
         scored = RecommenderService().get_recommendations(db, source_variant_id=variant.id, client_id=None, limit=10)
-        
+
         results = []
         for var_id, score in scored:
             variant_obj = db.get(GarmentVariant, var_id)
@@ -107,10 +97,8 @@ class AIService:
 
     def get_trending_products(self, db: Session, limit: int = 10):
         """Obtener productos tendencia (más vistos/comprados)."""
-        from sqlalchemy import func, desc
+
         from app.models.analytics import BrowsingHistory
-        from app.models.sales import SaleDetail
-        from sqlalchemy.orm import joinedload
 
         # Productos más vistos
         viewed = db.query(
@@ -152,7 +140,7 @@ class AIService:
         messages: [{"role": "user|assistant|system", "content": "..."}]
         """
         model = getattr(settings, "ollama_model", "llama3.2")
-        
+
         payload = {
             "model": model,
             "messages": messages,
@@ -188,7 +176,7 @@ class AIService:
     ) -> dict:
         """Chat con contexto (catálogo, FAQ, etc.)."""
         messages = []
-        
+
         # System prompt con contexto
         system_prompt = f"""Eres un asistente de moda para FashionStore. 
 Ayuda a los clientes con recomendaciones, información de productos, tallas, colores, disponibilidad y preguntas generales.
@@ -196,14 +184,14 @@ Ayuda a los clientes con recomendaciones, información de productos, tallas, col
 {context}
 
 Sé amable, conciso y útil. Responde en español."""
-        
+
         messages.append({"role": "system", "content": system_prompt})
-        
+
         if history:
             messages.extend(history[-10:])  # Últimos 10 mensajes
-        
+
         messages.append({"role": "user", "content": message})
-        
+
         return self.chat(messages, temperature=temperature, max_tokens=max_tokens)
 
     # ============================================================
@@ -218,18 +206,16 @@ Sé amable, conciso y útil. Responde en español."""
         # Tablas permitidas (whitelist)
         allowed_tables = {
             "venta", "venta_detalle", "pago", "reserva", "reserva_detalle",
-            "inventario", "movimiento_inventario", "recepcion_producto", 
+            "inventario", "movimiento_inventario", "recepcion_producto",
             "recepcion_producto_detalle", "prenda", "prenda_variante",
             "categoria", "talla", "color", "temporada", "coleccion",
             "cliente", "usuario", "sucursal", "proveedor",
-            "promocion", "promocion_prenda", "recepcion_producto",
-            "recepcion_producto_detalle", "inventario", "movimiento_inventario",
-            "bitacora_sistema", "notificacion", "recomendacion", "historial_navegacion"
+            "promocion", "promocion_prenda", "bitacora_sistema", "notificacion", "recomendacion", "historial_navegacion"
         }
 
         # Prompt para el modelo
         tables_info = self._get_tables_schema()
-        
+
         system_prompt = f"""Eres un generador de SQL para PostgreSQL. 
 Convierte lenguaje natural a SQL seguro.
 
@@ -253,11 +239,11 @@ Ejemplos:
         try:
             response = self._ollama_generate(model=getattr(settings, "ollama_model", "codellama"), prompt=f"{system_prompt}\n\nUsuario: {prompt}\n\nSQL:")
             sql = self._extract_sql(response)
-            
+
             # Validar SQL generado
             if not self._validate_sql(sql, allowed_tables):
                 raise ValidationError("SQL generado no cumple reglas de seguridad")
-            
+
             return {
                 "sql": sql,
                 "explanation": "SQL generado automáticamente desde lenguaje natural"
@@ -269,14 +255,14 @@ Ejemplos:
         """Ejecutar reporte generado por IA y devolver resultados."""
         result = self.generate_sql_query(prompt, max_rows)
         sql = result["sql"]
-        
+
         try:
             from app.core.database import engine
             with engine.connect() as conn:
                 result = conn.execute(text(sql))
                 columns = result.keys()
                 rows = [list(row) for row in result.fetchall()]
-                
+
                 return {
                     "columns": list(columns),
                     "rows": rows,
@@ -288,7 +274,7 @@ Ejemplos:
             raise ValidationError(f"Error ejecutando reporte: {str(e)}")
 
     # Métodos auxiliares privados
-    
+
     def _get_tables_schema(self) -> str:
         """Obtener esquema de tablas permitidas para el prompt."""
         # Simplificado - en producción se leería de information_schema
@@ -307,20 +293,20 @@ Ejemplos:
     def _validate_sql(self, sql: str, allowed_tables: set) -> bool:
         """Validar que el SQL cumple reglas de seguridad."""
         sql_upper = sql.upper().strip()
-        
+
         # Solo SELECT
         if not sql_upper.startswith("SELECT"):
             return False
-        
+
         # No palabras peligrosas
         forbidden = ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE"]
         for word in forbidden:
             if word in sql.upper():
                 return False
-        
+
         # Verificar tablas (básico)
         # En producción usar parser SQL real
-        
+
         return True
 
     def _extract_sql(self, response: str) -> str:
@@ -330,13 +316,13 @@ Ejemplos:
         code_blocks = re.findall(r"```sql\n(.*?)\n```", response, re.DOTALL | re.IGNORECASE)
         if code_blocks:
             return code_blocks[0].strip()
-        
+
         # Si no hay bloques, buscar SELECT
         import re
         select_match = re.search(r"(SELECT\s+.*?)(?:\n\n|$)", response, re.DOTALL | re.IGNORECASE)
         if select_match:
             return select_match.group(1).strip()
-        
+
         return response.strip()
 
     def _ollama_generate(self, model: str, prompt: str) -> str:

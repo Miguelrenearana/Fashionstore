@@ -1,11 +1,8 @@
-from datetime import datetime
-from decimal import Decimal
-from typing import Optional, List, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
-
 
 # ============================================================
 # CU-30: Recomendaciones
@@ -19,11 +16,11 @@ class RecommendationItem(ORMModel):
     color_name: str | None = None
     price: float
     score: float
-    garment_image_url: Optional[str] = None
+    garment_image_url: str | None = None
 
 
 class RecommendationResponse(ORMModel):
-    items: List[RecommendationItem]
+    items: list[RecommendationItem]
     source: Literal["similarity", "history", "trending"] = "similarity"
 
 
@@ -37,15 +34,15 @@ class AIChatMessage(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-    messages: List[AIChatMessage] = Field(min_length=1)
-    context: Optional[str] = None  # Contexto adicional (catálogo, FAQ, etc.)
+    messages: list[AIChatMessage] = Field(min_length=1)
+    context: str | None = None  # Contexto adicional (catálogo, FAQ, etc.)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=500, ge=1, le=2000)
 
 
 class AIChatResponse(BaseModel):
     message: str
-    tokens_used: Optional[int] = None
+    tokens_used: int | None = None
     model: str
     finish_reason: str
 
@@ -66,10 +63,10 @@ class AIReportColumn(BaseModel):
 
 
 class AIReportResponse(BaseModel):
-    columns: List[AIReportColumn]
-    rows: List[List[Optional[str]]]
+    columns: list[AIReportColumn]
+    rows: list[list[str | None]]
     row_count: int
-    generated_sql: Optional[str] = None
+    generated_sql: str | None = None
     execution_time_ms: float
 
 
@@ -89,7 +86,7 @@ class RecommendationRead(ORMModel):
 
 class AIChatRequestLegacy(BaseModel):
     message: str
-    context: Optional[str] = None
+    context: str | None = None
 
 
 class AIChatResponseLegacy(BaseModel):

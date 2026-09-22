@@ -1,14 +1,11 @@
-from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, HTTPException
 
-from app.core.dependencies import DbSession, CurrentUser
-from app.core.exceptions import NotFoundError
-from app.models.sales import Receipt, Sale, SaleStatus, SaleDetail
+from app.core.dependencies import CurrentUser, DbSession
 from app.models.catalog import GarmentVariant
+from app.models.sales import Receipt, Sale, SaleDetail
 from app.models.user import Client
 from app.schemas.receipt import ReceiptPageResponse
-from app.services.receipt_service import receipt_service
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
 

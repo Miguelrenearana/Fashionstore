@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -7,11 +7,11 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <div class="skeleton" [ngClass]="shapeClass">
-      @if (showText) {
+      @if (showText()) {
         <span class="skeleton-text"></span>
       } @else {
-        <span class="skeleton-avatar" *ngIf="showAvatar"></span>
-        <div class="skeleton-card" *ngIf="showCard"></div>
+        <span class="skeleton-avatar" *ngIf="showAvatar()"></span>
+        <div class="skeleton-card" *ngIf="showCard()"></div>
       }
     </div>
   `,
@@ -52,7 +52,15 @@ import { CommonModule } from '@angular/common';
   `]
 })
 export class UiSkeletonComponent {
-  shape = input<'text' | 'avatar' | 'card'>('text');
+  shape = input<'text' | 'avatar' | 'card' | 'title'>('text');
+  shapeClass = computed(() => {
+    switch (this.shape()) {
+      case 'avatar': return 'skeleton-avatar';
+      case 'card': return 'skeleton-card';
+      case 'title': return 'skeleton-title';
+      default: return 'skeleton-text';
+    }
+  });
   showText = computed(() => this.shape() === 'text');
   showAvatar = computed(() => this.shape() === 'avatar');
   showCard = computed(() => this.shape() === 'card');

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -7,16 +7,18 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <div class="table-wrapper">
-      <table>
+      <table class="table">
         <thead>
           <tr>
-            <th *ngFor="let column of columns()">{{ column.header }}</th>
+            <th *ngFor="let column of columns(); track column.header">{{ column.header }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let item of items(); trackBy: trackByItem">
             <td *ngFor="let column of columns()">
-              <ng-content [selector]="column.cellSelector || '.cell'">{{ item[column.property] }}</ng-content>
+              <ng-container [ngSwitch]="column.cellSelector">
+                <ng-container *ngSwitchDefault>{{ item[column.property] }}</ng-container>
+              </ng-container>
             </td>
           </tr>
         </tbody>
@@ -69,5 +71,5 @@ import { CommonModule } from '@angular/common';
 export class UiTableComponent {
   columns = input<Array<{header: string, property: string, cellSelector?: string}>>([]);
   items = input<Array<any>>([]);
-  trackByItem = (_: number, item: any) => item?.id || item?._id || item?.$index || 0;
+  trackByItem = input<(_: number, item: any) => any>((_: number, item: any) => item?.id || item?._id || item?.$index || 0);
 }

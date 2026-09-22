@@ -66,7 +66,7 @@ class Payment(Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="BOB", nullable=False)
     method: Mapped[str] = mapped_column(String(30), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default=SalePaymentStatus.PENDING, nullable=False)
-    
+
     # Static QR Gateway fields
     qr_payload: Mapped[str | None] = mapped_column(String(500), nullable=True)
     qr_svg: Mapped[str | None] = mapped_column(String, nullable=True)

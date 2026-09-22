@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from app.schemas.common import ORMModel
 
@@ -16,8 +15,8 @@ class ReceiptRead(ORMModel):
     id: int
     sale_id: int
     type: str
-    rnc_or_cuf: Optional[str] = None
-    document_url: Optional[str] = None
+    rnc_or_cuf: str | None = None
+    document_url: str | None = None
     created_at: datetime
 
 
@@ -25,12 +24,12 @@ class ReceiptDetailRead(ORMModel):
     id: int
     sale_id: int
     type: str
-    rnc_or_cuf: Optional[str] = None
-    document_url: Optional[str] = None
+    rnc_or_cuf: str | None = None
+    document_url: str | None = None
     created_at: datetime
     total_amount: float
     status: str
-    branch_name: Optional[str] = None
+    branch_name: str | None = None
     items: list["ReceiptDetailRead"] = []
 
 
@@ -38,11 +37,11 @@ class ReceiptListItem(ORMModel):
     id: int
     sale_id: int
     type: str
-    rnc_or_cuf: Optional[str] = None
+    rnc_or_cuf: str | None = None
     total_amount: float
     status: str
     created_at: datetime
-    branch_name: Optional[str] = None
+    branch_name: str | None = None
 
 
 class ReceiptPageResponse(ORMModel):

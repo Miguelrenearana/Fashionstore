@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -8,7 +8,7 @@ import { CommonModule } from '@angular/common';
   template: `
     <div class="form-select">
       <select>
-        <option *ngFor="let option of options()" [value]="option.value">{{ option.label }}</select>
+        <option *ngFor="let option of options(); track option.value" [value]="option.value">{{ option.label }}</option>
       </select>
     </div>
   `,

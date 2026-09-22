@@ -1,16 +1,16 @@
-from datetime import datetime, UTC
-from typing import Annotated, Optional, List
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Query
 
-from app.core.dependencies import DbSession, CurrentUser
+from app.core.dependencies import CurrentUser, DbSession
 from app.core.exceptions import NotFoundError, ValidationError
 from app.schemas.promotions import (
-    PromotionCreate, PromotionUpdate, PromotionRead, PromotionPageResponse,
-    PromotionWithGarmentsRead
+    PromotionCreate,
+    PromotionPageResponse,
+    PromotionRead,
+    PromotionUpdate,
+    PromotionWithGarmentsRead,
 )
-from app.schemas.common import Page
 from app.services.promotion_service import promotion_service
 
 router = APIRouter(prefix="/promotions", tags=["promotions"])
@@ -59,7 +59,7 @@ def list_promotions(
     )
 
 
-@router.get("/active", response_model=List[dict])
+@router.get("/active", response_model=list[dict])
 def get_active_promotions(db: DbSession):
     """Obtener promociones vigentes (para mostrar en catálogo)."""
     return promotion_service.get_active(db)
@@ -104,13 +104,13 @@ def delete_promotion(promotion_id: int, db: DbSession, current: CurrentUser = No
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/by-garment/{garment_id}", response_model=List[dict])
+@router.get("/by-garment/{garment_id}", response_model=list[dict])
 def get_promotions_by_garment(garment_id: int, db: DbSession):
     """Obtener promociones activas para una prenda específica."""
-    from datetime import datetime, UTC
-    from app.models.analytics import Promotion, PromotionGarment, PromotionStatus
     from sqlalchemy.orm import joinedload
-    
+
+    from app.models.analytics import Promotion, PromotionStatus
+
     now = datetime.now(UTC)
     promotions = db.query(Promotion).options(
         joinedload(Promotion.garments)
@@ -120,7 +120,7 @@ def get_promotions_by_garment(garment_id: int, db: DbSession):
         Promotion.start_at <= datetime.now(UTC),
         Promotion.end_at >= datetime.now(UTC),
     ).all()
-    
+
     return [
         {
             "id": p.id,

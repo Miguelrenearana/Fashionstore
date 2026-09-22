@@ -1,8 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
 
@@ -20,13 +20,13 @@ class HistorySaleItem(BaseModel):
 class HistorySaleRead(ORMModel):
     id: int
     invoice_number: str
-    branch_name: Optional[str] = None
+    branch_name: str | None = None
     total_amount: Decimal
     status: str
-    paid_at: Optional[datetime] = None
-    items: List[HistorySaleItem] = []
-    receipt_url: Optional[str] = None
-    receipt_type: Optional[str] = None
+    paid_at: datetime | None = None
+    items: list[HistorySaleItem] = []
+    receipt_url: str | None = None
+    receipt_type: str | None = None
 
 
 class HistoryReservationItem(BaseModel):
@@ -42,12 +42,12 @@ class HistoryReservationItem(BaseModel):
 class HistoryReservationRead(ORMModel):
     id: int
     pickup_code: str
-    branch_name: Optional[str] = None
+    branch_name: str | None = None
     total_amount: Decimal
     status: str
     created_at: datetime
-    expires_at: Optional[datetime] = None
-    items: List[HistoryReservationItem] = []
+    expires_at: datetime | None = None
+    items: list[HistoryReservationItem] = []
 
 
 class PurchaseHistoryItem(BaseModel):
@@ -57,12 +57,12 @@ class PurchaseHistoryItem(BaseModel):
     date: datetime
     total_amount: Decimal
     status: str
-    branch_name: Optional[str] = None
+    branch_name: str | None = None
     items_count: int
 
 
 class PurchaseHistoryResponse(BaseModel):
-    items: List[PurchaseHistoryItem]
+    items: list[PurchaseHistoryItem]
     total: int
     page: int
     size: int

@@ -2,11 +2,11 @@
 QR Code Generator for Bolivia QR Simple format (EMVCo-like).
 Generates QR codes compatible with Bolivian banking apps (BISA, BCP, etc.).
 """
+from dataclasses import dataclass
+from io import BytesIO
+
 import crcmod
 import qrcode
-from io import BytesIO
-from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -39,7 +39,7 @@ class QRSimpleBolivia:
     QR Simple Bolivia format (EMVCo-like).
     Based on Banco Central de Bolivia QR Simple specification.
     """
-    
+
     # EMVCo Tag IDs
     TAG_PAYLOAD_FORMAT = "00"
     TAG_POI_METHOD = "01"
@@ -54,20 +54,20 @@ class QRSimpleBolivia:
     TAG_REFERENCE_LABEL = "61"
     TAG_ADDITIONAL_DATA = "62"
     TAG_CRC = "63"
-    
+
     # Sub-tags for Merchant Account Information (26)
     SUB_TAG_GLOBALLY_UNIQUE = "00"  # AID
     SUB_TAG_MERCHANT_ID = "01"      # Merchant ID
     SUB_TAG_ACCOUNT = "02"          # Account/QR ID
-    
+
     def __init__(self):
         self.crc16 = crcmod.mkCrcFun(0x11021, rev=False, initCrc=0xFFFF, xorOut=0x0000)
-    
+
     def _format_tlv(self, tag: str, value: str) -> str:
         """Format TLV (Tag-Length-Value) - Length is 2 digits."""
         length = f"{len(value):02d}"
         return f"{tag}{length}{value}"
-    
+
     def _build_merchant_account(self, merchant_id: str, account: str) -> str:
         """Build Merchant Account Information (tag 26)."""
         parts = []
@@ -77,13 +77,13 @@ class QRSimpleBolivia:
         parts.append(self._format_tlv(self.SUB_TAG_ACCOUNT, account))
         merchant_account = "".join(parts)
         return self._format_tlv(self.TAG_MERCHANT_ACCOUNT, merchant_account)
-    
+
     def _calculate_crc(self, payload: str) -> str:
         """Calculate CRC16 for payload."""
         crc_payload = payload + self.TAG_CRC + "04"
         crc = self.crc16(crc_payload.encode('utf-8'))
         return f"{crc:04X}"
-    
+
     def build_static_qr(self, data: QRStaticData) -> str:
         """Build static QR payload (merchant info only, no amount)."""
         parts = [
@@ -98,7 +98,7 @@ class QRSimpleBolivia:
         payload = "".join(parts)
         crc = self._calculate_crc(payload)
         return payload + self._format_tlv(self.TAG_CRC, crc)
-    
+
     def build_dynamic_qr(self, data: QRDynamicData) -> str:
         """Build dynamic QR payload (includes amount and reference)."""
         parts = [
@@ -115,7 +115,7 @@ class QRSimpleBolivia:
         ]
         if data.description:
             parts.append(self._format_tlv(self.TAG_ADDITIONAL_DATA, data.description))
-        
+
         payload = "".join(parts)
         crc = self._calculate_crc(payload)
         return payload + self._format_tlv(self.TAG_CRC, crc)
@@ -131,9 +131,9 @@ def generate_qr_svg(payload: str, box_size: int = 10, border: int = 4) -> str:
     )
     qr.add_data(payload)
     qr.make(fit=True)
-    
+
     img = qr.make_image(fill_color="black", back_color="white")
-    
+
     # Convert to SVG string
     buffer = BytesIO()
     img.save(buffer, format="SVG")
@@ -151,9 +151,9 @@ def generate_qr_png_base64(payload: str, box_size: int = 10, border: int = 4) ->
     )
     qr.add_data(payload)
     qr.make(fit=True)
-    
+
     img = qr.make_image(fill_color="black", back_color="white")
-    
+
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("utf-8")

@@ -1,68 +1,19 @@
 """
 Tests for CU-33, CU-34, CU-35: Reportes y Auditoría
 """
-import json
-import uuid
-import hmac
-import hashlib
-from decimal import Decimal
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import create_access_token
-from app.models.sales import Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.catalog import Garment, GarmentVariant, Category, Size, Color
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.user import Client, User, Role, UserRole, Branch
 from app.models.analytics import AuditLog
-from app.models.sales import Payment, Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.user import Client, User, Role, UserRole, Branch
-from app.models.catalog import Garment, GarmentVariant, Category, Size, Color
+from app.models.catalog import Category, Color, Garment, GarmentVariant, Size
 from app.models.inventory import Inventory
-
-import pytest
-
-from app.core.config import settings
-from app.core.database import SessionLocal
-from app.core.security import create_access_token
-from app.models.sales import Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.catalog import Garment, GarmentVariant, Category, Size, Color
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.user import Client, User, Role, UserRole, Branch
-from app.models.analytics import AuditLog
-from app.models.sales import Payment, Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.user import Client, User, Role, UserRole, Branch
-from app.models.catalog import Garment, GarmentVariant, Category, Size, Color
-from app.models.inventory import Inventory
-from app.models.analytics import AuditLog
-from app.models.user import User, Role, UserRole
-
-import pytest
-
-from app.core.config import settings
-from app.core.database import SessionLocal
-from app.core.security import create_access_token
-from app.models.sales import Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.catalog import Garment, GarmentVariant, Category, Size, Color
-from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.user import Client, User, Role, UserRole, Branch
-from app.models.analytics import AuditLog
-from app.models.sales import Payment, Sale, SaleDetail, SaleStatus, SalePaymentStatus, Receipt
-from app.models.user import Client, User, Role, UserRole, Branch
-from app.models.catalog import Garment, GarmentVariant, Category, Size, Color
-from app.models.inventory import Inventory
+from app.models.sales import Sale, SaleStatus
+from app.models.user import Branch
 
 
 class TestCU33ReportesIndicadores:

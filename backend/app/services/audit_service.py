@@ -1,6 +1,5 @@
 import json
-from datetime import UTC, datetime
-from typing import List, Optional, Tuple
+from datetime import datetime
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -19,9 +18,9 @@ class AuditService:
         self,
         action: str,
         entity: str,
-        entity_id: Optional[int] = None,
-        user_id: Optional[int] = None,
-        metadata: Optional[dict] = None,
+        entity_id: int | None = None,
+        user_id: int | None = None,
+        metadata: dict | None = None,
     ):
         """Registrar acción en bitácora."""
         log = AuditLog(
@@ -38,12 +37,12 @@ class AuditService:
         self,
         page: int = 1,
         size: int = 20,
-        user_id: Optional[int] = None,
-        action: Optional[str] = None,
-        entity: Optional[str] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Tuple[List[dict], int]:
+        user_id: int | None = None,
+        action: str | None = None,
+        entity: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> tuple[list[dict], int]:
         """Obtener bitácora con filtros."""
         query = self.db.query(AuditLog)
 

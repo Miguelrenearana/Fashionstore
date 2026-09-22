@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <span class="badge {{ variantClass }}">{{ label }}</span>
+    <span class="badge {{ variantClass() }}">{{ label() }}</span>
   `,
   styles: [`
     .badge {
@@ -61,7 +61,5 @@ export class UiBadgeComponent {
   label = input<string>('');
   variant = input<'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral'>('neutral');
 
-  get variantClass(): string {
-    return `badge-${this.variant()}`;
-  }
+  variantClass = computed(() => `badge-${this.variant()}`);
 }

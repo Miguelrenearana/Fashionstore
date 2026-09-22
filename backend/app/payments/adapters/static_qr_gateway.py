@@ -6,12 +6,10 @@ Payment is confirmed either by user clicking "Pagar" or auto-completion after de
 """
 import hashlib
 import hmac
-import urllib.parse
 import uuid
-from decimal import Decimal
-from datetime import UTC, datetime, timedelta
-from typing import Optional
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from app.core.config import settings
 from app.core.exceptions import PaymentError
@@ -22,7 +20,6 @@ from app.payments.domain.entities import (
     PaymentStatusResult,
 )
 from app.payments.domain.gateway import PaymentGateway
-
 
 # In-memory storage for auto-completion tasks (in production use Redis/Celery)
 _pending_auto_complete: dict[str, dict] = {}
@@ -79,18 +76,18 @@ class StaticQRGateway(PaymentGateway):
     1. User clicking "Pagar" on the simulated payment page
     2. Auto-completion after configurable delay (for demo/testing)
     """
-    
+
     name = "static_qr"
-    
+
     def __init__(self, db=None) -> None:
         self.config = _load_config()
         self.db = db
-        
+
         if not self.config.webhook_secret:
             raise PaymentError(
                 "Static QR Gateway requires STATIC_QR_WEBHOOK_SECRET in settings."
             )
-    
+
     def create_payment(self, request: PaymentRequest) -> PaymentResult:
         """
         Create a dynamic QR payment.
@@ -100,18 +97,18 @@ class StaticQRGateway(PaymentGateway):
         """
         reference = _generate_reference()
         expires_at = datetime.now(UTC) + timedelta(minutes=self.config.timeout_minutes)
-        
+
         # Build QR URL (not the QR payload itself, but the payment page URL)
         payment_page_url = f"{self.config.base_url}/pay/{reference}"
-        
+
         # Generate QR SVG for the payment page URL
         qr_svg = self._generate_qr_svg(reference)
         qr_png_base64 = self._generate_qr_png_base64(reference)
-        
+
         # Payment page URL (the URL that the QR points to)
         payment_page_url = f"{self.config.base_url}/pay/{reference}"
         qr_api_url = f"{self.config.base_url}/api/v1/payments/qr/{reference}"
-        
+
         # Prepare raw data for storage
         raw_data = {
             "qr_payload": reference,
@@ -122,10 +119,10 @@ class StaticQRGateway(PaymentGateway):
             "expires_at": (datetime.now(UTC) + timedelta(minutes=self.config.timeout_minutes)).isoformat(),
             "auto_complete_seconds": self.config.auto_complete_seconds,
         }
-        
+
         # Schedule auto-completion (for demo/testing)
         self._schedule_auto_complete(reference)
-        
+
         return PaymentResult(
             gateway=self.name,
             reference=reference,
@@ -133,7 +130,7 @@ class StaticQRGateway(PaymentGateway):
             payment_url=reference,  # Return reference, frontend will use /api/v1/payments/qr/{ref}
             raw=raw_data,
         )
-    
+
     def get_status(self, reference: str) -> PaymentStatusResult:
         """
         Get payment status.
@@ -149,8 +146,8 @@ class StaticQRGateway(PaymentGateway):
             status=PaymentStatus.PENDING,
             raw={"checked_at": datetime.now(UTC).isoformat()}
         )
-    
-    def refund(self, reference: str, amount: Optional[Decimal] = None) -> PaymentResult:
+
+    def refund(self, reference: str, amount: Decimal | None = None) -> PaymentResult:
         """Process refund (simulated)."""
         return PaymentResult(
             gateway=self.name,
@@ -158,13 +155,14 @@ class StaticQRGateway(PaymentGateway):
             status=PaymentStatus.REFUNDED,
             raw={"amount": str(amount) if amount else "full", "simulated": True}
         )
-    
+
     def _generate_qr_svg(self, reference: str) -> str:
         """Generate QR SVG for the reference."""
+        from io import BytesIO
+
         import qrcode
         import qrcode.image.svg
-        from io import BytesIO
-        
+
         qr = qrcode.QRCode(
             version=None,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -174,19 +172,19 @@ class StaticQRGateway(PaymentGateway):
         )
         qr.add_data(reference)
         qr.make(fit=True)
-        
+
         img = qr.make_image(fill_color="black", back_color="white")
-        from io import BytesIO
         buffer = BytesIO()
         img.save(buffer)
         return buffer.getvalue().decode("utf-8")
-    
+
     def _generate_qr_png_base64(self, reference: str) -> str:
         """Generate QR as base64 PNG."""
         import base64
-        import qrcode
         from io import BytesIO
-        
+
+        import qrcode
+
         qr = qrcode.QRCode(
             version=None,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -195,22 +193,22 @@ class StaticQRGateway(PaymentGateway):
         )
         qr.add_data(reference)
         qr.make(fit=True)
-        
+
         img = qr.make_image(fill_color="black", back_color="white")
         buffer = BytesIO()
         img.save(buffer, format="PNG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
-    
+
     def _schedule_auto_complete(self, reference: str) -> None:
         """Schedule auto-completion for demo/testing."""
         config = _load_config()
         complete_at = datetime.now(UTC) + timedelta(seconds=config.auto_complete_seconds)
-        
+
         _pending_auto_complete[reference] = {
             "complete_at": datetime.now(UTC) + timedelta(seconds=config.auto_complete_seconds),
             "completed": False,
         }
-    
+
     @classmethod
     def check_auto_complete(cls, reference: str) -> bool:
         """Check if auto-completion should trigger."""
@@ -220,13 +218,13 @@ class StaticQRGateway(PaymentGateway):
                 task["completed"] = True
                 return True
         return False
-    
+
     @classmethod
     def mark_completed(cls, reference: str) -> None:
         """Mark payment as completed (called by webhook)."""
         if reference in _pending_auto_complete:
             _pending_auto_complete[reference]["completed"] = True
-    
+
     def verify_webhook(self, payload: str, signature: str) -> bool:
         """Verify webhook signature."""
         expected = hmac.new(

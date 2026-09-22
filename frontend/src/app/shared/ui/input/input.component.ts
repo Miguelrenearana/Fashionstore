@@ -2,7 +2,7 @@ import { Component, input, output, forwardRef, signal, computed } from '@angular
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/forms';
 
-export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'url';
+export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'date';
 
 @Component({
   selector: 'ui-input',
@@ -26,7 +26,7 @@ export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'url'
           [id]="id()"
           [type]="type()"
           [placeholder]="placeholder()"
-          [disabled]="disabled()"
+          [disabled]="_disabled()"
           [readonly]="readonly()"
           [class]="computedClasses()"
           [value]="value()"
@@ -81,6 +81,7 @@ export class UiInputComponent implements ControlValueAccessor {
   // Internal
   value = signal('');
   focused = signal(false);
+  _disabled = signal(false);
   private onChange = (v: string) => {};
   private onTouched = () => {};
 
@@ -90,6 +91,10 @@ export class UiInputComponent implements ControlValueAccessor {
     const focus = this.focused() ? 'focus' : '';
     return [base, err, focus].filter(Boolean).join(' ');
   });
+
+  ngOnChanges() {
+    this._disabled.set(this.disabled());
+  }
 
   onInput(event: Event) {
     const val = (event.target as HTMLInputElement).value;
@@ -103,5 +108,5 @@ export class UiInputComponent implements ControlValueAccessor {
   writeValue(val: string): void { this.value.set(val ?? ''); }
   registerOnChange(fn: (v: string) => void): void { this.onChange = fn; }
   registerOnTouched(fn: () => void): void { this.onTouched = fn; }
-  setDisabledState(disabled: boolean): void { this.disabled.set(disabled); }
+  setDisabledState(disabled: boolean): void { this._disabled.set(disabled); }
 }

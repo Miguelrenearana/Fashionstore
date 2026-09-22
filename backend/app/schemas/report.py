@@ -1,9 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.schemas.common import ORMModel
 
@@ -27,36 +26,36 @@ class IndicatorType(str, Enum):
 class IndicatorsRequest(BaseModel):
     start_date: datetime
     end_date: datetime
-    branch_id: Optional[int] = None
-    indicator_types: Optional[List[IndicatorType]] = None
+    branch_id: int | None = None
+    indicator_types: list[IndicatorType] | None = None
 
 
 class IndicatorItem(BaseModel):
     name: str
     value: float | int
-    unit: Optional[str] = None
-    trend: Optional[float] = None  # percentage change vs previous period
+    unit: str | None = None
+    trend: float | None = None  # percentage change vs previous period
 
 
 class IndicatorsResponse(ORMModel):
     generated_at: datetime
     period: str
-    indicators: List[IndicatorItem]
+    indicators: list[IndicatorItem]
 
 
 class AuditLogItem(ORMModel):
     id: int
-    user_id: Optional[int] = None
-    user_email: Optional[str] = None
+    user_id: int | None = None
+    user_email: str | None = None
     action: str
-    entity: Optional[str] = None
-    entity_id: Optional[int] = None
-    metadata_json: Optional[str] = None
+    entity: str | None = None
+    entity_id: int | None = None
+    metadata_json: str | None = None
     created_at: datetime
 
 
 class AuditLogPageResponse(ORMModel):
-    items: List[AuditLogItem]
+    items: list[AuditLogItem]
     total: int
     page: int
     size: int
@@ -71,19 +70,19 @@ class ConsolidatedItem(BaseModel):
     total_revenue: Decimal
     total_stock: int
     low_stock_items: int
-    top_selling_variant: Optional[str] = None
+    top_selling_variant: str | None = None
 
 
 class ConsolidatedResponse(ORMModel):
     generated_at: datetime
     period: str
-    branches: List[ConsolidatedItem]
+    branches: list[ConsolidatedItem]
     total_sales: Decimal
     total_revenue: Decimal
     total_orders: int
     total_stock: int
     low_stock_items: int
-    top_selling_variant: Optional[dict] = None
+    top_selling_variant: dict | None = None
 
 
 class SalesByPeriodItem(BaseModel):
@@ -96,15 +95,15 @@ class SalesByPeriodItem(BaseModel):
 class SalesByPeriodResponse(ORMModel):
     generated_at: datetime
     period_type: str  # daily, weekly, monthly
-    data: List[SalesByPeriodItem]
+    data: list[SalesByPeriodItem]
 
 
 class TopProductsItem(BaseModel):
     variant_id: int
     garment_name: str
     variant_sku: str
-    size_name: Optional[str] = None
-    color_name: Optional[str] = None
+    size_name: str | None = None
+    color_name: str | None = None
     total_quantity: int
     total_revenue: Decimal
     avg_price: Decimal
@@ -113,7 +112,7 @@ class TopProductsItem(BaseModel):
 class TopProductsResponse(ORMModel):
     generated_at: datetime
     period: str
-    items: List[TopProductsItem]
+    items: list[TopProductsItem]
 
 
 class LowStockItem(BaseModel):
@@ -122,15 +121,15 @@ class LowStockItem(BaseModel):
     variant_id: int
     variant_sku: str
     garment_name: str
-    size_name: Optional[str] = None
-    color_name: Optional[str] = None
+    size_name: str | None = None
+    color_name: str | None = None
     available: int
     reserved_quantity: int
 
 
 class LowStockResponse(ORMModel):
     generated_at: datetime
-    items: List[dict]
+    items: list[dict]
     total_low_stock: int
     out_of_stock_count: int
 
@@ -141,13 +140,13 @@ class TopCategoriesItem(BaseModel):
     total_revenue: Decimal
     total_quantity: int
     avg_price: Decimal
-    margin_pct: Optional[Decimal] = None
+    margin_pct: Decimal | None = None
 
 
 class TopCategoriesResponse(ORMModel):
     generated_at: datetime
     period: str
-    items: List[TopCategoriesItem]
+    items: list[TopCategoriesItem]
 
 
 class InventoryTurnoverItem(BaseModel):
@@ -158,14 +157,14 @@ class InventoryTurnoverItem(BaseModel):
     garment_name: str
     avg_daily_sales: Decimal
     current_stock: int
-    days_of_stock: Optional[Decimal] = None
-    turnover_rate: Optional[Decimal] = None
+    days_of_stock: Decimal | None = None
+    turnover_rate: Decimal | None = None
 
 
 class InventoryTurnoverResponse(ORMModel):
     generated_at: datetime
     period: str
-    items: List[InventoryTurnoverItem]
+    items: list[InventoryTurnoverItem]
     avg_turnover_rate: Decimal
 
 
@@ -175,13 +174,13 @@ class TopCategoriesItem(BaseModel):
     total_revenue: Decimal
     total_quantity: int
     avg_price: Decimal
-    margin_pct: Optional[Decimal] = None
+    margin_pct: Decimal | None = None
 
 
 class TopCategoriesResponse(ORMModel):
     generated_at: datetime
     period: str
-    items: List[TopCategoriesItem]
+    items: list[TopCategoriesItem]
 
 
 class InventoryValuationItem(BaseModel):
@@ -197,6 +196,6 @@ class InventoryValuationItem(BaseModel):
 
 class InventoryValuationResponse(ORMModel):
     generated_at: datetime
-    items: List[InventoryValuationItem]
+    items: list[InventoryValuationItem]
     total_value: Decimal
     total_items: int

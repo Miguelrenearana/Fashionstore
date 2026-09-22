@@ -105,11 +105,12 @@ def get_qr_svg(reference: str, db: DbSession):
     payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
+
+    from io import BytesIO
+
     import qrcode
     import qrcode.image.svg
-    from io import BytesIO
-    
+
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -119,12 +120,12 @@ def get_qr_svg(reference: str, db: DbSession):
     )
     qr.add_data(payment.gateway_reference)
     qr.make(fit=True)
-    
+
     img = qr.make_image(fill_color="black", back_color="white")
     buffer = BytesIO()
     img.save(buffer)
     svg_content = buffer.getvalue().decode("utf-8")
-    
+
     return Response(content=svg_content, media_type="image/svg+xml")
 
 
@@ -134,13 +135,12 @@ def get_qr_info(reference: str, db: DbSession):
     payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
-    from app.core.config import settings
+
     config = {
         "merchant_name": getattr(settings, "static_qr_merchant_name", "FashionStore"),
         "merchant_city": getattr(settings, "static_qr_merchant_city", "La Paz"),
     }
-    
+
     return {
         "reference": reference,
         "amount": float(payment.amount),
@@ -161,14 +161,13 @@ def payment_page(reference: str, db: DbSession):
     payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
-    from app.core.config import settings
+
     merchant_name = getattr(settings, "static_qr_merchant_name", "FashionStore")
     amount = float(payment.amount)
     currency = payment.currency
-    
+
     auto_complete = getattr(settings, "static_qr_auto_complete_seconds", 30)
-    
+
     html = f"""
     <!DOCTYPE html>
     <html lang="es">
@@ -282,16 +281,15 @@ def payment_page(reference: str, db: DbSession):
 @router.post("/webhook/static_qr")
 async def webhook_static_qr(request: Request, db: DbSession):
     """Webhook endpoint for static QR payment confirmation."""
-    from app.core.config import settings
-    
+
     webhook_secret = getattr(settings, "static_qr_webhook_secret", "")
     if not webhook_secret:
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
-    
+
     # Read raw body for signature verification
     body = await request.body()
     body_str = body.decode("utf-8")
-    
+
     # Verify signature
     signature = request.headers.get("X-Signature", "")
     expected = hmac.new(
@@ -299,44 +297,44 @@ async def webhook_static_qr(request: Request, db: DbSession):
         body_str.encode(),
         hashlib.sha256
     ).hexdigest()
-    
+
     if not hmac.compare_digest(expected, signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
-    
+
     try:
         payload = json.loads(body_str)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
-    
+
     reference = payload.get("reference")
     status = payload.get("status")
     amount = payload.get("amount")
-    
+
     if not reference or not status:
         raise HTTPException(status_code=400, detail="Missing required fields")
-    
+
     payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
+
     if payment.status == "COMPLETED":
         return {"success": True, "message": "Already completed"}
-    
+
     if status == "COMPLETED":
         payment.status = "COMPLETED"
         payment.qr_verified_at = datetime.now(UTC)
         payment.qr_webhook_received_at = datetime.now(UTC)
         payment.qr_verification_method = "webhook"
-        
+
         if payment.sale:
             payment.sale.status = "PAID"
             payment.sale.paid_at = datetime.now(UTC)
             from app.services.receipt_service import receipt_service
             receipt_service.generate(db, payment.sale)
-        
+
         db.commit()
         return {"success": True, "message": "Payment completed"}
-    
+
     return {"success": False, "message": "Invalid status"}
 
 
@@ -346,9 +344,8 @@ def qr_status(reference: str, db: DbSession):
     payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    
+
     # Check auto-completion
-    from app.payments.adapters.static_qr_gateway import StaticQRGateway
     if StaticQRGateway.check_auto_complete(payment.gateway_reference):
         payment.status = "COMPLETED"
         payment.qr_verified_at = datetime.now(UTC)
@@ -359,12 +356,12 @@ def qr_status(reference: str, db: DbSession):
             from app.services.receipt_service import receipt_service
             receipt_service.generate(db, payment.sale)
         db.commit()
-    
+
     # Check timeout
     if payment.status == "PENDING" and payment.qr_expires_at and datetime.now(UTC) > payment.qr_expires_at:
         payment.status = "TIMEOUT"
         db.commit()
-    
+
     return {
         "reference": payment.gateway_reference,
         "status": payment.status,

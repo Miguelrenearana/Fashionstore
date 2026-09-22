@@ -1,15 +1,15 @@
-from typing import Annotated, Optional, List
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import DbSession, CurrentUser
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.dependencies import CurrentUser, DbSession
+from app.core.exceptions import NotFoundError
+from app.models.catalog import GarmentVariant
 from app.models.user import Client
 from app.schemas.ai import (
-    RecommendationItem, RecommendationResponse,
-    AIChatRequest, AIChatResponse,
-    AIReportRequest, AIReportResponse,
-    RecommendationRead,
+    AIChatRequest,
+    AIChatResponse,
+    AIReportRequest,
+    AIReportResponse,
 )
 from app.services.ai_service import ai_service
 
@@ -17,7 +17,6 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 def _client_id(db, user) -> int:
-    from app.models.user import Client
     client = db.query(Client).filter(Client.user_id == user.id).first()
     if not client:
         raise NotFoundError("Cliente no encontrado")
@@ -43,16 +42,16 @@ def get_recommendations(
     - source=trending: productos tendencia
     """
     client_id = _client_id(db, current)
-    
+
     if source == "trending":
         results = ai_service.get_trending_products(db, limit=limit)
         return results
-    
+
     if source == "history":
-        results = ai_service.recommend_for_client(db, client_id=_client_id(db, current), source_variant_id=source_variant_id, limit=limit)
+        recs = ai_service.recommend_for_client(db, client_id=_client_id(db, current), source_variant_id=source_variant_id, limit=limit)
         # Transformar a formato de respuesta
         results = []
-        for rec in results:
+        for rec in recs:
             variant = db.query(GarmentVariant).get(rec.suggested_variant_id)
             if variant and variant.garment:
                 results.append({
@@ -65,9 +64,8 @@ def get_recommendations(
                     "score": float(rec.score),
                 })
         return results
-    
+
     # similarity (default)
-    from app.models.catalog import GarmentVariant
     results = ai_service.get_recommendations_by_variant(db, source_variant_id, limit)
     return results
 
@@ -94,7 +92,6 @@ def get_recommendations_by_variant(
 @router.post("/view/{variant_id}")
 def log_view(variant_id: int, db: DbSession, current: CurrentUser):
     """Registrar vista de producto para recomendaciones basadas en historial."""
-    from app.models.user import Client
     client_id = _client_id(db, current)
     ai_service.log_view(db, client_id, variant_id)
     return {"ok": True}
@@ -111,8 +108,8 @@ class AIChatMessage(BaseModel):
 
 class AIChatRequest(BaseModel):
     message: str
-    context: Optional[str] = None
-    history: List[dict] = []
+    context: str | None = None
+    history: list[dict] = []
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=500, ge=1, le=2000)
 
@@ -120,7 +117,7 @@ class AIChatRequest(BaseModel):
 class AIChatResponse(BaseModel):
     message: str
     model: str
-    tokens_used: Optional[int] = None
+    tokens_used: int | None = None
 
 
 @router.post("/chat", response_model=dict)
@@ -158,10 +155,10 @@ class AIReportRequest(BaseModel):
 
 
 class AIReportResponse(BaseModel):
-    columns: List[str]
-    rows: List[List[Optional[str]]]
+    columns: list[str]
+    rows: list[list[str | None]]
     row_count: int
-    generated_sql: Optional[str] = None
+    generated_sql: str | None = None
     execution_time_ms: float
 
 
@@ -178,7 +175,7 @@ def generate_ai_report(
     # Verificar rol ADMIN
     if "ADMIN" not in [r.name for r in current.roles]:
         raise HTTPException(status_code=403, detail="Solo administradores pueden generar reportes IA")
-    
+
     try:
         result = ai_service.generate_ai_report(request.prompt, request.max_rows)
         return {
@@ -201,7 +198,7 @@ def explain_sql(
     """Generar y explicar SQL sin ejecutar."""
     if "ADMIN" not in [r.name for r in current.roles]:
         raise HTTPException(status_code=403, detail="Solo administradores")
-    
+
     try:
         result = ai_service.generate_sql_query(prompt)
         return {
@@ -217,7 +214,6 @@ def explain_sql(
 # ============================================================
 
 def _client_id(db, user) -> int:
-    from app.models.user import Client
     client = db.query(Client).filter(Client.user_id == user.id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")

@@ -1,0 +1,145 @@
+# Estado Actual del Plan de Ejecución - FashionStore
+
+> **Última actualización**: verificado contra árbol de trabajo y git (status/log)
+> **Próxima IA**: Continuar desde **FASE 2 - recrear `admin-reports.component.ts`** (build roto)
+> **Commit actual**: `cc44967` — trabajado pero **con muchos cambios sin commitear**
+
+---
+
+## 🚨 PROBLEMA CRÍTICO #1: BUILD WEB ROTO
+
+`admin.routes.ts` importa `./admin-reports.component` (línea 7), pero **ese archivo NO EXISTE** (fue borrado `D` y nunca recreado). **Cualquier `ng build` falla.**
+
+**Acción obligatoria antes de tocar nada más:**
+1. Eliminar el import de `admin-reports.component.ts` en `frontend/src/app/features/admin/admin.routes.ts` **o** recrear el archivo completo (próxima IA elige).
+2. Verificar que `frontend/src/app/features/admin/admin-catalog-config.component.ts` esté **enrutada** (hoy NO lo está: `admin.routes.ts` usa `AdminCatalogComponent` de `admin-catalog.component.ts`, la versión nueva pulida quedó huérfana/untracked).
+
+---
+
+## ✅ Estado REAL verificado (NO asumen completado)
+
+| Fase | Real | Detalle verificado |
+|------|------|--------------------|
+| **FASE 0 - Tokens** | 🟡 **CASI** | `design-tokens.json` + `scripts/generate-tokens.js` + `design-system.css` commiteados en `cc44967`. **Pendiente**: `mobile/tools/generate_tokens.dart` está UNTRACKED (nunca commiteado) — ejecutar regen y commitear. |
+| **FASE 1 - Web Components** | ✅ **12/12** | button, input, card, modal, select, table, tabs, badge, chip, avatar, toast(service+component), skeleton. **OJO**: badge, input, select, skeleton, table, tabs tienen **modificaciones SIN commitear**. |
+| **FASE 2 - Web Polish** | 🟡 **PARCIAL** | Solo 4 pantallas tienen imports reales de `shared/ui` (ver tabla abajo). **`admin-promotions.component.ts` NO EXISTE** en frontend. |
+| **FASE 3 - Mobile** | 🔴 **MUY PARCIAL** | `app_animations.dart` ✅ existe (UNTRACKED). Promotions feature ❌ **NO EXISTE**. 6 empty SVGs ❌ **NO EXISTEN** (`assets/images/empty/` ausente). theme con pageTransitions no aplicado. |
+| **FASE 4 - E2E** | 🔴 **NO hecho** | Sin evidencia de ejecución en sesión. |
+| **FASE 5 - Build/Deploy** | 🟡 **PARCIAL** | Flutter APK reportado OK en sesión previa; web ROTA por admin-reports. Backend: muchos cambios sin commitear. |
+
+---
+
+## FASE 2 - Pantallas Web (estado real)
+
+| # | Pantalla | Archivo | Estado verificado |
+|---|----------|---------|-------------------|
+| 1 | Landing | `landing.component.ts` | ✅ usa `UiButton` + utilities |
+| 2 | Login | `login.component.ts` | Existe, sin import shared/ui detectado (revisar polish) |
+| 3 | Forgot Password | `forgot-password.component.ts` | ✅ usa `UiButton` + `UiInput` |
+| 4 | Reset Password | `reset-password.component.ts` | ✅ usa `UiButton` + `UiInput` |
+| 5 | AdminUsers | `admin-users.component.ts` | Existe, sin import shared/ui detectado |
+| 6 | AdminProducts | `admin-products.component.ts` | ✅ usa `UiButton/UiInput/UiSelect/UiTable/UiCard` |
+| 7 | AdminCatalogConfig | `admin-catalog-config.component.ts` | Existe (UNTRACKED) pero **NO enrutada** |
+| 8 | AdminInventory | `admin-inventory.component.ts` | Existe, sin import shared/ui |
+| 9 | AdminPromotions | `admin-promotions.component.ts` | ❌ **NO EXISTE** |
+| 10 | AdminReports | `admin-reports.component.ts` | ❌ **BORRADO / build roto** |
+| 11 | AdminAIReports | `admin-ai-reports.component.ts` | Existe, sin import shared/ui |
+| 12 | StaffReservations | `staff/staff-reservations.component.ts` | Existe, sin import shared/ui |
+| 13 | POS | `pos/pos.component.ts` | Existe, sin import shared/ui |
+| 14 | AdminShell | `admin/admin-shell.component.ts` | Existe |
+
+**Rutas web**: `app.routes.ts` → auth, admin, staff, pos (con guards + RoleGuard). Rutas admin en `admin.routes.ts` (usa componentes en su mayoría sin polish).
+
+---
+
+## FASE 3 - Mobile (estado real)
+
+- ✅ `mobile/lib/core/animation/app_animations.dart` — EXISTE (UNTRACKED)
+- ✅ `mobile/lib/core/design/design_tokens.dart` + `design.dart` + `app_theme.dart` + `app_text_theme.dart` + `app_color_scheme.dart` — EXISTEN
+- ✅ `mobile/tools/generate_tokens.dart` — EXISTE (UNTRACKED)
+- ❌ `mobile/lib/features/promotions/` — **NO EXISTE** (screens reales: ai, ar_fitting, auth, cart, catalog, profile, reservations)
+- ❌ `mobile/assets/images/empty/*.svg` — **NO EXISTEN** (assets solo: `garments/` y `placeholders/`)
+- ⚠️ `pageTransitionsTheme` NO aplicable — `package:flutter/page_transitions.dart` no existe en la versión instalada
+- Backend `routes_promotions.py` + `schemas/promotions.py` + `promotion_service.py` están **modificados sin commitear** (base API de promociones disponible)
+
+---
+
+## 📦 Git - cambios sin commitear (importante)
+
+**Modificados (M)**: ~24 archivos backend (routes_ai, routes_history, routes_products, routes_promotions, routes_receipt, routes_reports, payments/*, schemas/*, services/*, models/sales) + 6 componentes shared/ui (badge, input, select, skeleton, table, tabs) + 4 pantallas (landing, forgot, reset, admin-products).
+
+**Borrado (D)**: `frontend/src/app/features/admin/admin-reports.component.ts` ← **causa del build roto**.
+
+**Untracked (??)**: `PLAN_EJECUCION_ESTADO_ACTUAL.md`, `PLAN_EJECUCION_POLISH_E2E.md`, `README_CREDENCIALES.md`, `admin-catalog-config.component.ts`, `mobile/lib/core/animation/app_animations.dart`, `mobile/tools/generate_tokens.dart`, scripts temporales raíz (`assign_roles.py`, `create_accounts.py/.bat`, `create_test_accounts.py`, `query_db.py`, `query_neon.py/.bat`, `run_query.bat`, `verify_login.py`).
+
+> Los cambios backend (payments QR gateway, reports, ai, history) son trabajo previo válido pero **sin commitear** — la próxima IA debe decidir commit vs. revisar.
+
+---
+
+## 🔐 Credenciales de prueba verificadas (login 200 + roles en JWT)
+
+| Rol | Email | Password | Roles JWT |
+|-----|-------|----------|-----------|
+| Admin | `admin@test.fashionstore.com` | `TestPass123!` | `['CLIENT','ADMIN']` |
+| Manager | `manager@test.fashionstore.com` | `TestPass123!` | `['CLIENT','MANAGER']` |
+| Staff | `staff@test.fashionstore.com` | `TestPass123!` | `['CASHIER','CLIENT']` |
+| Cashier | `cashier@test.fashionstore.com` | `TestPass123!` | `['CASHIER','CLIENT']` |
+| Cliente | `cliente@test.fashionstore.com` | `TestPass123!` | `['CLIENT']` |
+
+Backend: `https://fashionstore-api-r4me.onrender.com` (health OK) · Frontend: `https://fashionstore-git-main-sonclar.vercel.app` · CORS Vercel OK
+
+---
+
+## 📋 COLAS DE TRABAJO (en orden, para próxima IA)
+
+### Paso 1 - Desbloquear build web (URGENTE)
+- [ ] Decidir: recrear `admin-reports.component.ts` completo (recomendado) o reemplazarlo por stub + ruta temporal.
+- [ ] Verificar `npm run build` → 0 errores.
+
+### Paso 2 - Enrutar pantallas pulidas huérfanas
+- [ ] Conectar `admin-catalog-config.component.ts` en `admin.routes.ts` (hoy no está).
+
+### Paso 3 - Continuar FASE 2 (web polish restante)
+- [ ] Login, admin-users, admin-inventory, admin-ai-reports, staff-reservations, POS, admin-shell.
+- [ ] **Crear** `admin-promotions.component.ts` (CU-11) + ruta (NO existe en frontend).
+
+### Paso 4 - FASE 3 (mobile)
+- [ ] Crear feature `mobile/lib/features/promotions/` (CU-11): model + provider + `promotions_screen.dart` + ruta en `catalog_routes.dart`.
+- [ ] Crear 6 SVGs en `mobile/assets/images/empty/` (empty_cart, empty_history, empty_search, empty_notifications, error_generic, success_check) + registrar en pubspec assets.
+- [ ] `flutter analyze`, `flutter test`, `flutter build apk --release --split-per-abi`.
+
+### Paso 5 - Limpieza pendiente del usuario (a confirmar antes de borrar)
+- [ ] Tests inútiles en `backend/tests/` (hay 18 archivos; 3 modificados: cu25, cu33_34_35, products).
+- [ ] Basura en Neon: usuarios de prueba tienen rol CLIENT duplicado; decidir remoción.
+- [ ] Scripts temporales de raíz (ver sección Git untracked).
+
+### Paso 6 - FASE 4 (E2E 34 CUs) + FASE 5 (builds/deploy)
+- [ ] Checklists web (Chrome PC) + mobile (device físico) según `PLAN_EJECUCION_POLISH_E2E.md`.
+- [ ] Builds finales web + mobile + backend health.
+
+### Paso 7 - Commitear
+- [ ] Commit de trabajo actual (backend + shared/ui + pantallas) ANTES de continuar, o al final, con mensaje descriptivo.
+
+---
+
+## 📝 Notas para la próxima IA
+
+> **Build roto primero.** `admin-reports.component.ts` fue borrado (`D`) — NO está "duplicado", está **ausente**. No intentar arreglar duplicados (ya se resolvió borrando y reescribiendo; el archivo quedó eliminado sin recrear).
+
+> **No asumir FASE 3 completa**: promotions feature y empty SVGs NUNCA fueron creados físicamente, aunque el commit `cc44967` lo mencione en su mensaje. Verificar SIEMPRE contra filesystem.
+
+> **admin-promotions (CU-11)** no existe en web: hay que crearla desde cero (solo existe la API backend modificada).
+
+> **Modo plan para limpieza**: la limpieza de tests y DB requiere confirmación explícita del usuario antes de borrar.
+
+---
+
+## 📁 Archivos clave
+
+- `frontend/src/app/features/admin/admin.routes.ts` — importa `admin-reports.component` (faltante) y usa `admin-catalog.component` (no la versión pulida).
+- `frontend/src/app/features/admin/admin-catalog-config.component.ts` — pulida pero NO enrutada.
+- `frontend/src/app/features/admin/admin-products.component.ts` — referencia de polish completo (5 componentes shared/ui).
+- `frontend/src/app/shared/ui/tabs/tabs.component.ts` — usa `output<string>()`; NO usar `TabKey` (no existe tal tipo; el plan lo sugería erróneamente).
+- `mobile/lib/core/animation/app_animations.dart` — ya creado (UNTRACKED).
+- `backend/app/api/v1/routes_promotions.py` + `promotion_service.py` — API promociones modificada sin commitear.
+- `PLAN_EJECUCION_POLISH_E2E.md` — plan maestro (Fases 0-5, 14 pantallas web, 18+1 mobile, E2E 34 CUs).

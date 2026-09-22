@@ -32,6 +32,7 @@ class Reservation(Base, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text)
 
     client = relationship("Client", back_populates="reservations")
+    branch = relationship("Branch")
     details = relationship("ReservationDetail", back_populates="reservation", cascade="all, delete-orphan")
     history = relationship("ReservationHistory", back_populates="reservation", cascade="all, delete-orphan")
 

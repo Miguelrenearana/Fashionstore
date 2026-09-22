@@ -1,11 +1,19 @@
 ﻿import secrets
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal, engine
 from app.core.security import hash_password
-from app.models.analytics import Promotion
+from app.models.analytics import (
+    AuditLog,
+    BrowsingHistory,
+    Notification,
+    Promotion,
+    PromotionStatus,
+)
+from app.models.cart import Cart, CartDetail
 from app.models.catalog import (
     Category,
     Collection,
@@ -17,11 +25,29 @@ from app.models.catalog import (
     Size,
 )
 from app.models.inventory import Inventory
-from app.models.reservation import Reservation, ReservationDetail, ReservationStatus
-from app.models.sales import Payment, Receipt, Sale, SaleDetail, SalePaymentStatus, SaleStatus
+from app.models.movement import (
+    InventoryMovement,
+    InventoryMovementType,
+    Reception,
+    ReceptionDetail,
+)
+from app.models.reservation import (
+    Reservation,
+    ReservationDetail,
+    ReservationHistory,
+    ReservationStatus,
+)
+from app.models.sales import (
+    Payment,
+    Receipt,
+    Sale,
+    SaleDetail,
+    SalePaymentStatus,
+    SaleStatus,
+)
 from app.models.user import Branch, City, Client, Employee, Role, Supplier, User
 
-# Credenciales demo (NUNCA usar en producciÃ³n).
+# Credenciales demo (NUNCA usar en producción).
 # `sonclargod@gmail.com` es el cliente demo con email REAL (recibe correo real via SMTP).
 DEMO_PASSWORDS = {
     "admin@fashionstore.dev": "Admin123!",
@@ -112,9 +138,13 @@ def _ensure_variant(
     sku_prefix: str,
     price: float,
 ) -> GarmentVariant:
-    sku = f"{sku_prefix}-{size.name.upper()}-{color.name.upper()[:2]}-{secrets.token_hex(3).upper()}"
-    variant = db.query(GarmentVariant).filter(GarmentVariant.sku == sku).first()
+    variant = db.query(GarmentVariant).filter(
+        GarmentVariant.garment_id == garment.id,
+        GarmentVariant.size_id == size.id,
+        GarmentVariant.color_id == color.id,
+    ).first()
     if not variant:
+        sku = f"{sku_prefix}-{size.name.upper()}-{color.name.upper()[:2]}-{secrets.token_hex(3).upper()}"
         variant = GarmentVariant(
             garment_id=garment.id,
             size_id=size.id,
@@ -135,6 +165,83 @@ def _ensure_inventory(db: Session, branch: Branch, variant: GarmentVariant, quan
     if not exists:
         db.add(Inventory(branch_id=branch.id, variant_id=variant.id, quantity=quantity))
         db.flush()
+
+
+def _ensure_promotion(
+    db: Session,
+    name: str,
+    description: str,
+    discount_percent: float,
+    start_at: datetime,
+    end_at: datetime,
+) -> Promotion:
+    promotion = db.query(Promotion).filter(Promotion.name == name).first()
+    if not promotion:
+        promotion = Promotion(
+            name=name,
+            description=description,
+            discount_percent=discount_percent,
+            start_at=start_at,
+            end_at=end_at,
+            status=PromotionStatus.ACTIVE,
+        )
+        db.add(promotion)
+        db.flush()
+    return promotion
+
+
+def _make_paid_sale(
+    db: Session,
+    invoice_prefix: str,
+    client: Client | None,
+    branch: Branch,
+    employee: Employee | None,
+    items: list[tuple[GarmentVariant, int]],
+    paid_at: datetime,
+    payment_method: str = "QR",
+    total: Decimal | None = None,
+) -> Sale:
+    """Crear una venta PAID con su detalle, pago completado y comprobante."""
+    sale = Sale(
+        invoice_number=f"FAC-{invoice_prefix}-{secrets.token_hex(3).upper()}",
+        client_id=client.id if client else None,
+        branch_id=branch.id,
+        employee_id=employee.id if employee else None,
+        total_amount=total or Decimal("0"),
+        payment_method=payment_method,
+        status=SaleStatus.PAID,
+        paid_at=paid_at,
+    )
+    db.add(sale)
+    db.flush()
+    subtotal = Decimal("0")
+    for variant, qty in items:
+        subtotal += variant.price * qty
+        db.add(SaleDetail(
+            sale_id=sale.id,
+            variant_id=variant.id,
+            quantity=qty,
+            unit_price=variant.price,
+        ))
+    sale.total_amount = total or subtotal
+    db.add(Payment(
+        sale_id=sale.id,
+        gateway_reference=f"PAY-{secrets.token_hex(6).upper()}",
+        amount=sale.total_amount,
+        currency="BOB",
+        method=payment_method,
+        status=SalePaymentStatus.COMPLETED,
+        qr_verified_at=paid_at,
+        qr_manually_marked_paid=True,
+    ))
+    db.add(Receipt(
+        sale_id=sale.id,
+        type="invoice",
+        rnc_or_cuf=f"78000001-1-26-{secrets.token_hex(4).upper()}",
+        document_url=None,
+    ))
+    db.flush()
+    return sale
 
 
 def run() -> None:
@@ -165,7 +272,7 @@ def run() -> None:
     db.commit()
 
     # ---- Usuarios demo ----
-    _ensure_user(db, "admin@fashionstore.dev", DEMO_PASSWORDS["admin@fashionstore.dev"], "ADMIN")
+    admin_user = _ensure_user(db, "admin@fashionstore.dev", DEMO_PASSWORDS["admin@fashionstore.dev"], "ADMIN")
     manager_user = _ensure_user(db, "manager@fashionstore.dev", DEMO_PASSWORDS["manager@fashionstore.dev"], "MANAGER")
     cashier_user = _ensure_user(db, "cashier@fashionstore.dev", DEMO_PASSWORDS["cashier@fashionstore.dev"], "CASHIER")
     demo_client_user = _ensure_user(db, "client@fashionstore.dev", DEMO_PASSWORDS["client@fashionstore.dev"], "CLIENT")
@@ -173,61 +280,86 @@ def run() -> None:
     supplier_user = _ensure_user(db, "supplier@fashionstore.dev", DEMO_PASSWORDS["supplier@fashionstore.dev"], "SUPPLIER")
     db.commit()
 
-    if not db.query(Employee).filter(Employee.user_id == manager_user.id).first():
-        db.add(Employee(
+    manager_employee = db.query(Employee).filter(Employee.user_id == manager_user.id).first()
+    if not manager_employee:
+        manager_employee = Employee(
             user_id=manager_user.id,
             branch_id=branch_lp.id,
             first_name="Gerente",
             last_name="Demo",
             hire_date=date(2025, 1, 10),
-        ))
-    if not db.query(Employee).filter(Employee.user_id == cashier_user.id).first():
-        db.add(Employee(
+        )
+        db.add(manager_employee)
+        db.flush()
+    cashier_employee = db.query(Employee).filter(Employee.user_id == cashier_user.id).first()
+    if not cashier_employee:
+        cashier_employee = Employee(
             user_id=cashier_user.id,
             branch_id=branch_lp.id,
             first_name="Cajero",
             last_name="Demo",
             hire_date=date(2025, 3, 15),
-        ))
-    if not db.query(Client).filter(Client.user_id == demo_client_user.id).first():
-        db.add(Client(
+        )
+        db.add(cashier_employee)
+        db.flush()
+    demo_client = db.query(Client).filter(Client.user_id == demo_client_user.id).first()
+    if not demo_client:
+        demo_client = Client(
             user_id=demo_client_user.id,
             first_name="Cliente",
             last_name="Demo",
             birth_date=date(1995, 5, 20),
             points=120,
-        ))
-    if not db.query(Client).filter(Client.user_id == real_client_user.id).first():
-        db.add(Client(
+        )
+        db.add(demo_client)
+        db.flush()
+    real_client = db.query(Client).filter(Client.user_id == real_client_user.id).first()
+    if not real_client:
+        real_client = Client(
             user_id=real_client_user.id,
             first_name="Cliente",
             last_name="Real",
             birth_date=date(1993, 3, 10),
-            points=0,
-        ))
-    if not db.query(Supplier).filter(Supplier.company_name == "Textiles Andinos SRL").first():
-        db.add(Supplier(
+            points=340,
+        )
+        db.add(real_client)
+        db.flush()
+    supplier = db.query(Supplier).filter(Supplier.company_name == "Textiles Andinos SRL").first()
+    if not supplier:
+        supplier = Supplier(
             company_name="Textiles Andinos SRL",
             contact_name="Proveedor Demo",
             email=supplier_user.email,
             address="Zona Central, La Paz",
-        ))
+        )
+        db.add(supplier)
+        db.flush()
     db.commit()
 
     # ---- Catálogo ----
-    season = db.query(Season).filter(Season.name == "OtoÃ±o/Invierno 2026").first()
-    if not season:
-        season = Season(name="OtoÃ±o/Invierno 2026")
-        db.add(season)
+    season_ow = db.query(Season).filter(Season.name == "Otoño/Invierno 2026").first()
+    if not season_ow:
+        season_ow = Season(name="Otoño/Invierno 2026")
+        db.add(season_ow)
         db.flush()
-    collection = db.query(Collection).filter(Collection.name == "ColecciÃ³n Urbana").first()
-    if not collection:
-        collection = Collection(season_id=season.id, name="ColecciÃ³n Urbana", launch_year=2026)
-        db.add(collection)
+    season_pv = db.query(Season).filter(Season.name == "Primavera/Verano 2027").first()
+    if not season_pv:
+        season_pv = Season(name="Primavera/Verano 2027")
+        db.add(season_pv)
+        db.flush()
+    collection_urbana = db.query(Collection).filter(Collection.name == "Colección Urbana").first()
+    if not collection_urbana:
+        collection_urbana = Collection(season_id=season_ow.id, name="Colección Urbana", launch_year=2026)
+        db.add(collection_urbana)
+        db.flush()
+    collection_floral = db.query(Collection).filter(Collection.name == "Colección Floral").first()
+    if not collection_floral:
+        collection_floral = Collection(season_id=season_pv.id, name="Colección Floral", launch_year=2027)
+        db.add(collection_floral)
         db.flush()
 
     cat_camisas = _ensure_category(db, "Camisas", "Prendas formales y casuales")
-    cat_poleras = _ensure_category(db, "Poleras", "Hoodies y buzos para el dia a dia")
+    cat_poleras = _ensure_category(db, "Poleras", "Hoodies y buzos para el día a día")
     cat_pantalones = _ensure_category(db, "Pantalones", "Todas las siluetas y cortes")
     cat_vestidos = _ensure_category(db, "Vestidos", "Cocktail, casual y largo")
     cat_chaquetas = _ensure_category(db, "Chaquetas", "Abrigos y casacas")
@@ -250,124 +382,356 @@ def run() -> None:
     db.commit()
 
     garments = [
-        ("Camisa Oxford BÃ¡sica", cat_camisas, "Camisa de algodÃ³n, corte regular.", 180.0, True),
-        ("Camisa Slim Rayas", cat_camisas, "Camisa slim con rayas sutiles.", 220.0, False),
-        ("Hoodie Urban Core", cat_poleras, "Hoodie de algodÃ³n grueso con capucha.", 260.0, True),
-        ("Buzo Classic", cat_poleras, "Buzo clÃ¡sico con bolsillo canguro.", 240.0, False),
-        ("PantalÃ³n Chino Slim", cat_pantalones, "Chino slim para todas las ocasiones.", 200.0, False),
-        ("Jeans Skinny", cat_pantalones, "Denim elÃ¡stico corte skinny.", 245.0, False),
-        ("Vestido Casual", cat_vestidos, "Vestido casual de algodÃ³n.", 290.0, True),
-        ("Vestido Largo", cat_vestidos, "Vestido largo estilo bohemio.", 350.0, True),
-        ("Chaqueta Denim", cat_chaquetas, "Casaca de jean clÃ¡sica.", 320.0, True),
-        ("Rompevientos Ligero", cat_chaquetas, "Chaqueta rompevientos impermeable.", 310.0, False),
+        # (nombre, categoría, colección, descripción, precio, AR)
+        ("Camisa Oxford Básica", cat_camisas, collection_urbana, "Camisa de algodón, corte regular.", 180.0, True),
+        ("Camisa Slim Rayas", cat_camisas, collection_urbana, "Camisa slim con rayas sutiles.", 220.0, False),
+        ("Hoodie Urban Core", cat_poleras, collection_urbana, "Hoodie de algodón grueso con capucha.", 260.0, True),
+        ("Buzo Classic", cat_poleras, collection_urbana, "Buzo clásico con bolsillo canguro.", 240.0, False),
+        ("Pantalón Chino Slim", cat_pantalones, collection_urbana, "Chino slim para todas las ocasiones.", 200.0, False),
+        ("Jeans Skinny", cat_pantalones, collection_urbana, "Denim elástico corte skinny.", 245.0, False),
+        ("Vestido Casual", cat_vestidos, collection_floral, "Vestido casual de algodón.", 290.0, True),
+        ("Vestido Largo", cat_vestidos, collection_floral, "Vestido largo estilo bohemio.", 350.0, True),
+        ("Chaqueta Denim", cat_chaquetas, collection_urbana, "Casaca de jean clásica.", 320.0, True),
+        ("Rompevientos Ligero", cat_chaquetas, collection_urbana, "Chaqueta rompevientos impermeable.", 310.0, False),
+        ("Blusa Seda Floral", cat_camisas, collection_floral, "Blusa de seda con estampado floral.", 210.0, True),
+        ("Camiseta Básica Algodón", cat_poleras, collection_floral, "Camiseta sin estampado, algodón 100%.", 120.0, False),
     ]
 
+    all_variants: list[GarmentVariant] = []
     first_garment = None
-    for name, cat, desc, price, is_ar in garments:
-        g = _ensure_garment(db, cat, collection, name, desc, price, is_ar)
+    combos = [("S", "Negro"), ("M", "Blanco"), ("L", "Azul"), ("XL", "Rojo")]
+    for idx, (name, cat, col, desc, price, is_ar) in enumerate(garments):
+        g = _ensure_garment(db, cat, col, name, desc, price, is_ar)
         first_garment = first_garment or g
         sku_prefix = "".join(ch for ch in name.upper().split()[0] if ch.isalnum())
-        # Variantes: 2 combinaciones talla/color por prenda
-        combos = [("S", "Negro"), ("M", "Blanco"), ("L", "Azul"), ("XL", "Rojo")]
-        for idx, (sz, col) in enumerate(combos[:2]):
+        # Variantes: 2-4 combinaciones talla/color por prenda
+        n_variants = 2 if idx % 4 else 4
+        for sz, col_name in combos[:n_variants]:
             size = sizes[sz]
-            color = colors[col]
+            color = colors[col_name]
             v = _ensure_variant(db, g, size, color, sku_prefix, price)
-            _ensure_inventory(db, branch_lp, v, 25 if idx == 0 else 18)
-            _ensure_inventory(db, branch_sc, v, 12)
+            all_variants.append(v)
+            _ensure_inventory(db, branch_lp, v, 25)
+            _ensure_inventory(db, branch_sc, v, 12 if idx % 3 else 5)
     db.commit()
 
-    promotion = db.query(Promotion).first()
-    if not promotion:
-        promotion = Promotion(
-            name="Primera reserva -10%",
-            description="Descuento por primera reserva",
-            discount_percent=10.0,
-            start_at=datetime(2026, 9, 1),
-            end_at=datetime(2026, 12, 31),
-        )
-        db.add(promotion)
-        db.flush()
-    if first_garment is not None and first_garment not in promotion.garments:
-        promotion.garments.append(first_garment)
-    db.commit()
+    if not all_variants:
+        all_variants = db.query(GarmentVariant).order_by(GarmentVariant.id).all()
 
-    # ---- Datos demo para flujos (reservas + venta POS) ----
-    real_client = db.query(Client).filter(Client.user_id == real_client_user.id).first()
-    cashier_employee = db.query(Employee).filter(Employee.user_id == cashier_user.id).first()
-
-    variant_a = (
-        first_garment.variations[0] if first_garment is not None and first_garment.variations
-        else db.query(GarmentVariant).first()
+    # ---- Promociones (CU-11) ----
+    promo_primera = _ensure_promotion(
+        db,
+        "Primera reserva -10%",
+        "Descuento por primera reserva",
+        10.0,
+        datetime(2026, 9, 1, tzinfo=UTC),
+        datetime(2026, 12, 31, tzinfo=UTC),
     )
+    promo_hot = _ensure_promotion(
+        db,
+        "Hot Sale -15%",
+        "Descuento especial de temporada",
+        15.0,
+        datetime(2026, 9, 15, tzinfo=UTC),
+        datetime(2026, 10, 31, tzinfo=UTC),
+    )
+    promo_vencida = _ensure_promotion(
+        db,
+        "Liquidación de verano",
+        "Promoción finalizada",
+        30.0,
+        datetime(2026, 1, 1, tzinfo=UTC),
+        datetime(2026, 3, 31, tzinfo=UTC),
+    )
+    promo_vencida.status = PromotionStatus.EXPIRED
+    # Vincular prendas a las promociones (variedad)
+    def _link_garments(promotion: Promotion, garments_to_link: list[Garment]) -> None:
+        for g in garments_to_link:
+            if g not in promotion.garments:
+                promotion.garments.append(g)
+    all_garments = db.query(Garment).order_by(Garment.id).all()
+    _link_garments(promo_primera, all_garments[:3])
+    _link_garments(promo_hot, all_garments[3:7])
+    _link_garments(promo_vencida, all_garments[7:10])
+    db.commit()
 
-    if real_client is not None and not db.query(Reservation).filter(
-        Reservation.pickup_code.like("DEMO-%")
-    ).first():
+    # ---- Historial de navegación (CU-30) ----
+    if db.query(BrowsingHistory).count() == 0:
+        for i, v in enumerate(all_variants[:8]):
+            db.add(BrowsingHistory(
+                client_id=real_client.id,
+                variant_id=v.id,
+                view_count=3 + (i % 5),
+            ))
+        for v in all_variants[8:12]:
+            db.add(BrowsingHistory(
+                client_id=demo_client.id,
+                variant_id=v.id,
+                view_count=1,
+            ))
+        db.commit()
+
+    # ---- Carrito demo (CU-20) ----
+    existing_cart = db.query(Cart).filter(Cart.client_id == real_client.id).first()
+    if not existing_cart:
+        cart = Cart(client_id=real_client.id, branch_id=branch_lp.id, is_active=True)
+        db.add(cart)
+        db.flush()
+        for v in all_variants[:2]:
+            db.add(CartDetail(
+                cart_id=cart.id,
+                variant_id=v.id,
+                quantity=1,
+                unit_price=v.price,
+            ))
+        db.commit()
+
+    # ---- Recepciones de productos (CU-29) ----
+    if db.query(Reception).count() == 0:
+        rec1 = Reception(
+            supplier_id=supplier.id,
+            branch_id=branch_lp.id,
+            employee_id=manager_employee.id,
+            received_at=datetime(2026, 9, 5, tzinfo=UTC),
+            purchase_order_ref=f"PO-SEED-{secrets.token_hex(3).upper()}",
+            notes="Recepción de camisas y buzos por Textiles Andinos",
+        )
+        db.add(rec1)
+        db.flush()
+        for v in all_variants[:3]:
+            db.add(ReceptionDetail(
+                reception_id=rec1.id,
+                variant_id=v.id,
+                quantity=20,
+                cost_price=Decimal(str(round(float(v.price) * 0.6, 2))),
+            ))
+            # Sumar stock en la sucursal (consistente con reception_service)
+            inv = db.query(Inventory).filter(
+                Inventory.branch_id == branch_lp.id,
+                Inventory.variant_id == v.id,
+            ).first()
+            if inv:
+                inv.quantity += 20
+        rec2 = Reception(
+            supplier_id=supplier.id,
+            branch_id=branch_sc.id,
+            employee_id=manager_employee.id,
+            received_at=datetime(2026, 9, 12, tzinfo=UTC),
+            purchase_order_ref=f"PO-SEED-{secrets.token_hex(3).upper()}",
+            notes="Recepción de vestidos para Equipetrol",
+        )
+        db.add(rec2)
+        db.flush()
+        for v in all_variants[6:8]:
+            db.add(ReceptionDetail(
+                reception_id=rec2.id,
+                variant_id=v.id,
+                quantity=15,
+                cost_price=Decimal(str(round(float(v.price) * 0.55, 2))),
+            ))
+            inv = db.query(Inventory).filter(
+                Inventory.branch_id == branch_sc.id,
+                Inventory.variant_id == v.id,
+            ).first()
+            if inv:
+                inv.quantity += 15
+        db.commit()
+
+    # ---- Movimientos de inventario (CU-28) ----
+    if db.query(InventoryMovement).count() == 0:
+        for v in all_variants[:4]:
+            db.add(InventoryMovement(
+                branch_id=branch_lp.id,
+                variant_id=v.id,
+                movement_type=InventoryMovementType.IN,
+                quantity=20,
+                reason="Recepción de proveedor",
+            ))
+        db.add(InventoryMovement(
+            branch_id=branch_lp.id,
+            variant_id=all_variants[0].id,
+            movement_type=InventoryMovementType.OUT,
+            quantity=4,
+            reason="Venta presencial",
+        ))
+        db.add(InventoryMovement(
+            branch_id=branch_sc.id,
+            variant_id=all_variants[6].id,
+            movement_type=InventoryMovementType.IN,
+            quantity=15,
+            reason="Recepción de proveedor",
+        ))
+        db.commit()
+
+    # ---- Reservas demo (CU-15, CU-16, CU-17, CU-18) ----
+    if not db.query(Reservation).filter(Reservation.pickup_code.like("DEMO-%")).first():
         now = datetime.now(UTC)
 
-        def mk_reservation(status: str | ReservationStatus, hours_ago: int, code: str) -> Reservation:
+        def mk_reservation(status: ReservationStatus | str, minutes_from: int, code: str) -> Reservation:
             return Reservation(
                 client_id=real_client.id,
                 branch_id=branch_lp.id,
                 status=status.value if isinstance(status, ReservationStatus) else status,
                 pickup_code=f"DEMO-{code}",
-                expires_at=now + timedelta(hours=hours_ago),
-                total_amount=variant_a.price if variant_a else 0,
+                expires_at=now + timedelta(minutes=minutes_from),
+                total_amount=Decimal("0"),
                 notes="Reserva demo generada por seed",
             )
-        r_pending = mk_reservation(ReservationStatus.PENDING, 2, "P001")
-        r_prepared = mk_reservation(ReservationStatus.PREPARED, 3, "P002")
-        r_trial = mk_reservation(ReservationStatus.IN_TRIAL, 4, "P003")
-        db.add_all([r_pending, r_prepared, r_trial])
+
+        r_pending = mk_reservation(ReservationStatus.PENDING, 120, "P001")
+        r_prepared = mk_reservation(ReservationStatus.PREPARED, 180, "P002")
+        r_trial = mk_reservation(ReservationStatus.IN_TRIAL, 240, "P003")
+        r_completed = mk_reservation(ReservationStatus.COMPLETED, -1200, "P004")
+        r_cancelled = mk_reservation(ReservationStatus.CANCELLED, -600, "P005")
+        r_expired = mk_reservation(ReservationStatus.EXPIRED, -1800, "P006")
+        db.add_all([r_pending, r_prepared, r_trial, r_completed, r_cancelled, r_expired])
         db.flush()
-        for r in (r_pending, r_prepared, r_trial):
-            if variant_a is not None:
+        for r, vars_to_add in (
+            (r_pending, all_variants[:2]),
+            (r_prepared, all_variants[1:3]),
+            (r_trial, all_variants[2:4]),
+            (r_completed, all_variants[4:6]),
+            (r_cancelled, all_variants[0:1]),
+            (r_expired, all_variants[3:4]),
+        ):
+            total = Decimal("0")
+            for v in vars_to_add:
                 db.add(ReservationDetail(
                     reservation_id=r.id,
-                    variant_id=variant_a.id,
+                    variant_id=v.id,
                     quantity=1,
-                    unit_price=variant_a.price,
+                    unit_price=v.price,
                 ))
+                total += v.price
+            r.total_amount = total
         db.commit()
 
-    if (
-        real_client is not None
-        and variant_a is not None
-        and not db.query(Sale).filter(Sale.invoice_number.like("DEMO-%")).first()
-    ):
-        sale = Sale(
-            invoice_number=f"DEMO-{secrets.token_hex(4).upper()}",
-            client_id=real_client.id,
-            branch_id=branch_lp.id,
-            employee_id=cashier_employee.id if cashier_employee else None,
-            total_amount=variant_a.price,
-            payment_method="QR",
-            status=SaleStatus.PAID,
-            paid_at=datetime.now(UTC),
-        )
-        db.add(sale)
-        db.flush()
-        db.add(SaleDetail(
-            sale_id=sale.id,
-            variant_id=variant_a.id,
-            quantity=1,
-            unit_price=variant_a.price,
-        ))
-        db.add(Payment(
-            sale_id=sale.id,
-            gateway_reference=f"DEMO-QR-{secrets.token_hex(4).upper()}",
-            amount=variant_a.price,
-            currency="BOB",
-            method="QR",
-            status=SalePaymentStatus.COMPLETED,
-        ))
-        db.add(Receipt(
-            sale_id=sale.id,
-            type="invoice",
-            rnc_or_cuf=None,
-            document_url=None,
-        ))
+    # ---- Historial de estados de reserva (CU-34/17) ----
+    if db.query(ReservationHistory).count() == 0:
+        reservations = db.query(Reservation).order_by(Reservation.id).all()
+        status_order = [
+            ReservationStatus.PENDING,
+            ReservationStatus.PREPARED,
+            ReservationStatus.IN_TRIAL,
+            ReservationStatus.COMPLETED,
+        ]
+        for r in reservations:
+            prev = None
+            for target in status_order:
+                if r.status == ReservationStatus.CANCELLED.value:
+                    target = ReservationStatus.CANCELLED
+                elif r.status == ReservationStatus.EXPIRED.value:
+                    target = ReservationStatus.EXPIRED
+                db.add(ReservationHistory(
+                    reservation_id=r.id,
+                    from_status=prev.value if prev else None,
+                    to_status=target.value,
+                    changed_by_user_id=cashier_user.id,
+                    comment="Cambio de estado",
+                ))
+                prev = target
+                if target == ReservationStatus.CANCELLED or target == ReservationStatus.EXPIRED:
+                    break
+        db.commit()
+
+    # ---- Ventas histórico variadas (CU-22, CU-24, CU-26, CU-33, CU-35) ----
+    if not db.query(Sale).filter(Sale.invoice_number.like("%-SEED-%")).first():
+        dates = [
+            datetime(2026, 8, 3, tzinfo=UTC),
+            datetime(2026, 8, 17, tzinfo=UTC),
+            datetime(2026, 8, 29, tzinfo=UTC),
+            datetime(2026, 9, 2, tzinfo=UTC),
+            datetime(2026, 9, 8, tzinfo=UTC),
+            datetime(2026, 9, 15, tzinfo=UTC),
+            datetime(2026, 9, 18, tzinfo=UTC),
+        ]
+        patterns = [
+            (all_variants[0:2], "QR"),
+            (all_variants[2:4], "card"),
+            (all_variants[4:6], "cash"),
+            (all_variants[6:7], "QR"),
+            (all_variants[8:10], "card"),
+            (all_variants[10:12], "cash"),
+            (all_variants[1:3], "QR"),
+        ]
+        for i, (items, method) in enumerate(patterns):
+            paid_at = dates[i]
+            current_items = [
+                (v, (i % 3) + 1)
+                for v in (items if isinstance(items, list) else [items])
+            ]
+            # 1 de cada 4 ventas al cliente demo, el resto al cliente real
+            buyer = real_client if i % 4 else demo_client
+            employee = cashier_employee if i % 3 else manager_employee
+            _make_paid_sale(
+                db,
+                f"SEED-{i + 1:02d}",
+                client=buyer,
+                branch=branch_lp if i % 2 == 0 else branch_sc,
+                employee=employee,
+                items=current_items,
+                paid_at=paid_at,
+                payment_method=method,
+            )
+        db.commit()
+
+    # ---- Notificaciones demo (CU-03 UI) ----
+    if not db.query(Notification).filter(Notification.user_id == real_client_user.id).first():
+        db.add_all([
+            Notification(
+                user_id=real_client_user.id,
+                type="PROMOTION",
+                title="Hot Sale -15%",
+                body="Descuentos especiales en toda la colección hasta el 31 de octubre.",
+                is_read=True,
+            ),
+            Notification(
+                user_id=real_client_user.id,
+                type="RESERVATION",
+                title="Tu reserva DEMO-P001 está lista",
+                body="Ya puedes pasar a probarte tus prendas en Sucursal Sopocachi.",
+                is_read=False,
+            ),
+            Notification(
+                user_id=real_client_user.id,
+                type="RESERVATION",
+                title="Tu reserva está en preparación",
+                body="El staff está preparando tus prendas reservadas.",
+                is_read=False,
+            ),
+            Notification(
+                user_id=real_client_user.id,
+                type="SYSTEM",
+                title="Bienvenida FashionStore",
+                body="Tu cuenta demo está lista. ¡Explora el catálogo!",
+                is_read=False,
+            ),
+            Notification(
+                user_id=cashier_user.id,
+                type="STOCK",
+                title="Stock bajo",
+                body="Algunas variantes tienen stock bajo en Sucursal Sopocachi.",
+                is_read=False,
+            ),
+        ])
+        db.commit()
+
+    # ---- Bitácora / trazabilidad (CU-34) ----
+    if db.query(AuditLog).count() == 0:
+        admin_id = admin_user.id
+        manager_id = manager_user.id
+        cashier_id = cashier_user.id
+        db.add_all([
+            AuditLog(user_id=admin_id, action="LOGIN", entity="User", entity_id=admin_id, metadata_json=None),
+            AuditLog(user_id=admin_id, action="CREATE", entity="User", entity_id=manager_user.id, metadata_json=None),
+            AuditLog(user_id=admin_id, action="CREATE", entity="Product", entity_id=first_garment.id if first_garment else None, metadata_json=None),
+            AuditLog(user_id=manager_id, action="CREATE", entity="Promotion", entity_id=promo_hot.id, metadata_json=None),
+            AuditLog(user_id=manager_id, action="ADJUST", entity="Inventory", entity_id=None, metadata_json='{"reason": "stock demo"}'),
+            AuditLog(user_id=cashier_id, action="CREATE", entity="Reservation", entity_id=None, metadata_json=None),
+            AuditLog(user_id=cashier_id, action="PREPARE", entity="Reservation", entity_id=None, metadata_json=None),
+            AuditLog(user_id=cashier_id, action="SALE_PAID", entity="Sale", entity_id=None, metadata_json=None),
+            AuditLog(user_id=real_client_user.id, action="LOGIN", entity="User", entity_id=real_client_user.id, metadata_json=None),
+        ])
         db.commit()
 
     print("Seeding completed.")

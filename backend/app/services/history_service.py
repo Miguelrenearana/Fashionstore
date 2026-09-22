@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.catalog import GarmentVariant
 from app.models.reservation import Reservation, ReservationDetail
-from app.models.sales import Sale, SaleDetail
+from app.models.sales import Receipt, Sale, SaleDetail
 
 
 class HistoryService:
@@ -28,7 +28,6 @@ class HistoryService:
         all_items.sort(key=lambda x: x["date"], reverse=True)
 
         # Paginación
-        total = len(all_items)
         start = (page - 1) * 20
         end = start + 20
         items = all_items[start:end]
@@ -37,14 +36,19 @@ class HistoryService:
 
     def _get_client_sales(self, db, client_id: int) -> list[dict]:
         sales = db.query(Sale).options(
-            joinedload(Sale.details).joinedload(SaleDetail.variant)
-            .joinedload(GarmentVariant.garment)
-            .joinedload(GarmentVariant.size)
-            .joinedload(GarmentVariant.color),
+            joinedload(Sale.details).joinedload(SaleDetail.variant).joinedload(GarmentVariant.garment),
+            joinedload(Sale.details).joinedload(SaleDetail.variant).joinedload(GarmentVariant.size),
+            joinedload(Sale.details).joinedload(SaleDetail.variant).joinedload(GarmentVariant.color),
             joinedload(Sale.branch),
         ).filter(Sale.client_id == client_id).order_by(desc(Sale.created_at)).all()
 
         result = []
+        receipt_map: dict[int, Receipt] = {
+            r.sale_id: r
+            for r in db.query(Receipt).filter(
+                Receipt.sale_id.in_([s.id for s in sales])
+            )
+        } if sales else {}
         for sale in sales:
             items = []
             for detail in sale.details:
@@ -60,6 +64,7 @@ class HistoryService:
                         "line_total": line_total,
                     })
 
+            receipt = receipt_map.get(sale.id)
             result.append({
                 "type": "sale",
                 "id": sale.id,
@@ -70,18 +75,17 @@ class HistoryService:
                 "branch_name": sale.branch.name if sale.branch else None,
                 "items_count": len(sale.details),
                 "items": items,
-                "receipt_url": sale.receipts[0].document_url if sale.receipts else None,
-                "receipt_type": sale.receipts[0].type if sale.receipts else None,
+                "receipt_url": receipt.document_url if receipt else None,
+                "receipt_type": receipt.type if receipt else None,
             })
 
         return result
 
     def _get_client_reservations(self, db, client_id: int) -> list[dict]:
         reservations = db.query(Reservation).options(
-            joinedload(Reservation.details).joinedload(ReservationDetail.variant)
-            .joinedload(GarmentVariant.garment)
-            .joinedload(GarmentVariant.size)
-            .joinedload(GarmentVariant.color),
+            joinedload(Reservation.details).joinedload(ReservationDetail.variant).joinedload(GarmentVariant.garment),
+            joinedload(Reservation.details).joinedload(ReservationDetail.variant).joinedload(GarmentVariant.size),
+            joinedload(Reservation.details).joinedload(ReservationDetail.variant).joinedload(GarmentVariant.color),
             joinedload(Reservation.branch),
         ).filter(Reservation.client_id == client_id).order_by(desc(Reservation.created_at)).all()
 

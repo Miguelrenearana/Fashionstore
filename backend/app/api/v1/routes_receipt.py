@@ -65,10 +65,9 @@ def get_receipt(receipt_id: int, db: DbSession, current: CurrentUser):
 
     receipt = db.query(Receipt).options(
         joinedload(Receipt.sale).joinedload(Sale.branch),
-        joinedload(Receipt.sale).joinedload(Sale.details).joinedload(SaleDetail.variant)
-        .joinedload(GarmentVariant.garment)
-        .joinedload(GarmentVariant.size)
-        .joinedload(GarmentVariant.color),
+        joinedload(Receipt.sale).joinedload(Sale.details).joinedload(SaleDetail.variant).joinedload(GarmentVariant.garment),
+        joinedload(Receipt.sale).joinedload(Sale.details).joinedload(SaleDetail.variant).joinedload(GarmentVariant.size),
+        joinedload(Receipt.sale).joinedload(Sale.details).joinedload(SaleDetail.variant).joinedload(GarmentVariant.color),
     ).filter(Receipt.id == receipt_id).first()
 
     if not receipt:

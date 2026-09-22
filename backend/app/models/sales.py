@@ -33,6 +33,7 @@ class Sale(Base, TimestampMixin):
     reservation = relationship("Reservation")
     client = relationship("Client")
     branch = relationship("Branch", back_populates="sales")
+    receipts = relationship("Receipt", back_populates="sale")
 
 
 class SaleDetail(Base, TimestampMixin):
@@ -89,3 +90,5 @@ class Receipt(Base, TimestampMixin):
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # invoice | credit_note
     rnc_or_cuf: Mapped[str | None] = mapped_column(String(60))
     document_url: Mapped[str | None] = mapped_column(String(500))
+
+    sale = relationship("Sale", back_populates="receipts")

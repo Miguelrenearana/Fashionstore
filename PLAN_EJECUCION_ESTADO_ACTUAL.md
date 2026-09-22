@@ -135,3 +135,20 @@ Backend: `https://fashionstore-api-r4me.onrender.com` (health OK) Â· Frontend: `
 - `mobile/lib/core/animation/app_animations.dart` â€” ya creado (UNTRACKED).
 - `backend/app/api/v1/routes_promotions.py` + `promotion_service.py` â€” API promociones modificada sin commitear.
 - `PLAN_EJECUCION_POLISH_E2E.md` â€” plan maestro (Fases 0-5, 14 pantallas web, 18+1 mobile, E2E 34 CUs).
+---
+
+## ?? Verificación "haz lo conveniente" (sesión actual)
+
+### Hallazgo: los 6 SVGs *empty* del plan son TRABAJO BASURA — NO crearlos
+- El empty state mobile usa **iconos Material** (AppEmptyState con `IconData`), **NO SVGs**. Se verificó: `AppEmptyState` (icon + title + message + action), `ProductCard` usa `Icons.checkroom` fallback, reservations usa `Icons.event_available_outlined`, notifications `Icons.campaign_outlined`.
+- `pubspec.yaml` solo registra `assets/images/placeholders/` y `assets/images/garments/` — **NO existe ni se referencia `assets/images/empty/`** en ning?n .dart (grep dio 2 coincidencias, ambas v?lvulas Material, y refs de SVG=0).
+- ? **Eliminar de la FASE 3 del plan** la tarea "crear 6 SVGs en \ssets/images/empty/\". No aportan nada al build y violan el criterio "sin trabajo basura".
+
+### CU-11 MOTER móvil (PromotionsScreen) — PENDIENTE REAL, NO empujable
+- **No existe** `mobile/lib/features/promotions/` (verificado: no hay feature ni se enruta; `promotion_models.dart` borrado al detectar archivo corrupto por bug de write ang lax).
+- Backend CU-11 base existe: `routes_promotions.py` (POST/GET/PATCH/DELETE + GET /active + by-garment) + `promotion_service.py` + schemas, incluido en **commit 22075c2** (features backend commiteada). API lista para el front.
+- **Próxima IA debe recrear** el feature móvil completo con estrategia anti-bug del write tool (archivos pequeños + `Remove-Item` antes de cada reescritura, tal como se hizo con `admin-promotions.component.ts`).
+
+## ?? Git HEAD
+- **HEAD: `6b55b38`** "docs: estado real tras CU-11 web enrutado (promotions + shell nav)". Tambi?n previos: `22075c2` (CU-11 web componente+navegación) y `22075c2^` (backend promotions + polish).
+- Web (CU-11) ?; móvil (CU-11) ? documentado para la próxima IA.

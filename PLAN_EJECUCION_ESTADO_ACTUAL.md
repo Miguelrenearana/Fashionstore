@@ -2,7 +2,7 @@
 
 > **Última actualización**: verificado contra árbol de trabajo y git (status/log)
 > **Próxima IA**: Continuar desde **FASE 2/3 - CU-11 mobile no existe aún** (web CU-11 DONE)
-> **Commit actual**: `6b55b38` — AdminPromotions (CU-11) ENRUTADO + link nav shell + build web 0 errores (además de `22075c2` con AdminReports recreado + AdminCatalogConfig enrutado + backend pensa)
+> **Commit actual**: `14081f2` — login (CU-01) pulido con shared/ui + verificación FASE 4/5 (pytest 92 collect · flutter test +8 · build web verde · 3 APKs release)
 
 ---
 

@@ -8,6 +8,7 @@ import '../../features/auth/auth_routes.dart';
 import '../../features/cart/cart_routes.dart';
 import '../../features/catalog/catalog_routes.dart';
 import '../../features/profile/profile_routes.dart';
+import '../../features/promotions/promotions_routes.dart';
 import '../../features/reservations/reservation_routes.dart';
 import '../../shared/widgets/app_shell.dart';
 
@@ -54,9 +55,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Auth + AR live on the root navigator (no bottom nav).
+      // Auth + AR + Promotions live on the root navigator (no bottom nav).
       ...AuthRoutes.routes,
       ...ArFittingRoutes.routes,
+      ...PromotionsRoutes.routes,
     ],
   );
 });

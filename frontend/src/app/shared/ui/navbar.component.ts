@@ -30,6 +30,7 @@ import { NotificationsComponent } from './notifications.component';
         <div class="navbar-actions desktop-actions flex items-center gap-2">
           @if (!auth.isAuthenticated()) {
             <a routerLink="/auth" routerLinkActive="active" class="btn btn-ghost nav-link">Iniciar sesión</a>
+            <a routerLink="/auth/register" class="btn btn-outline btn-sm nav-link" style="border-color: currentColor; color: var(--color-text-on-nav);">Registrarse</a>
           } @else {
             @if (auth.isAuthenticated()) {
               <app-notifications />
@@ -73,8 +74,9 @@ import { NotificationsComponent } from './notifications.component';
             }
           </ul>
           <div class="mobile-nav-footer">
-            @if (!auth.isAuthenticated()) {
-              <a routerLink="/auth" class="btn btn-primary btn-block" (click)="closeMobileMenu()">Iniciar sesión</a>
+@if (!auth.isAuthenticated()) {
+              <li><a routerLink="/auth" class="mobile-nav-link" (click)="closeMobileMenu()">Iniciar sesión</a></li>
+              <li><a routerLink="/auth/register" class="mobile-nav-link" (click)="closeMobileMenu()">Registrarse</a></li>
             } @else {
               <button (click)="logout()" class="btn btn-danger btn-block">Cerrar sesión</button>
             }

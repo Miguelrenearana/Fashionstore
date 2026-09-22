@@ -10,6 +10,15 @@ export interface LoginResponse {
   token_type: string;
 }
 
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  birth_date?: string;
+}
+
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'CASHIER', 'BRANCH_MANAGER'];
 
 @Injectable({ providedIn: 'root' })
@@ -27,6 +36,17 @@ export class AuthService {
       .post<LoginResponse>(`${environment.apiUrl}/auth/login`, body.toString(), {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
+      .pipe(
+        tap((res) => {
+          localStorage.setItem('fs_token', res.access_token);
+          this.token.set(res.access_token);
+        })
+      );
+  }
+
+  registerClient(payload: RegisterPayload): Observable<LoginResponse> {
+    return this.http
+      .post<LoginResponse>(`${environment.apiUrl}/auth/register`, payload)
       .pipe(
         tap((res) => {
           localStorage.setItem('fs_token', res.access_token);

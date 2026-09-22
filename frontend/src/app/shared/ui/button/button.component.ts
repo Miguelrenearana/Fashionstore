@@ -16,11 +16,11 @@ export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
       (click)="onClick($event)">
       @if (loading()) {
         <span class="spinner" aria-hidden="true"></span>
-      } @else if (icon() && !label()) {
-        <span class="icon">{{ icon() }}</span>
-      } @else {
+      } @else if (label() || icon()) {
         @if (icon()) { <span class="icon">{{ icon() }}</span> }
         @if (label()) { <span class="label">{{ label() }}</span> }
+      } @else {
+        <ng-content></ng-content>
       }
     </button>
   `,

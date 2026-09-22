@@ -40,6 +40,10 @@ import { UiCardComponent } from '@shared/ui/card';
       <p class="text-center text-sm text-secondary mt-4">
         <a routerLink="/auth/forgot-password" class="text-primary hover:underline">¿Olvidé mi contraseña?</a>
       </p>
+      <p class="text-center text-sm text-secondary mt-2">
+        ¿No tienes cuenta?
+        <a routerLink="/auth/register" class="text-primary hover:underline">Regístrate</a>
+      </p>
     </section>
   `,
   styles: [

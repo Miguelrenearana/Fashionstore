@@ -8,9 +8,10 @@ from app.services.product_service import product_service
 router = APIRouter(prefix="/products", tags=["products"])
 
 admin_manager = require_roles("ADMIN", "MANAGER")
+catalog_reader = require_roles("ADMIN", "MANAGER", "CASHIER")
 
 
-@router.get("", response_model=list[GarmentRead], dependencies=[Depends(admin_manager)])
+@router.get("", response_model=list[GarmentRead], dependencies=[Depends(catalog_reader)])
 def list_products(db: DbSession, page: int = 1, size: int = 50):
     offset = (page - 1) * size
     return db.query(Garment).offset(offset).limit(size).all()

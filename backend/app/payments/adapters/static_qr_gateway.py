@@ -70,7 +70,7 @@ def _verify_webhook_signature(payload: str, signature: str, secret: str) -> bool
 class StaticQRGateway(PaymentGateway):
     """
     Static QR Gateway with Dynamic Simulated QR.
-    
+
     Generates dynamic QR codes that open a simulated payment page.
     Payment is confirmed either by:
     1. User clicking "Pagar" on the simulated payment page
@@ -91,32 +91,29 @@ class StaticQRGateway(PaymentGateway):
     def create_payment(self, request: PaymentRequest) -> PaymentResult:
         """
         Create a dynamic QR payment.
-        
+
         Generates a dynamic QR code that opens a simulated payment page.
         The QR contains a URL to the payment page, not static account info.
         """
         reference = _generate_reference()
         expires_at = datetime.now(UTC) + timedelta(minutes=self.config.timeout_minutes)
 
-        # Build QR URL (not the QR payload itself, but the payment page URL)
-        payment_page_url = f"{self.config.base_url}/pay/{reference}"
-
-        # Generate QR SVG for the payment page URL
-        qr_svg = self._generate_qr_svg(reference)
-        qr_png_base64 = self._generate_qr_png_base64(reference)
-
-        # Payment page URL (the URL that the QR points to)
+        # URLs del gateway
         payment_page_url = f"{self.config.base_url}/pay/{reference}"
         qr_api_url = f"{self.config.base_url}/api/v1/payments/qr/{reference}"
+
+        # Imagenes QR generadas para la referencia
+        qr_svg = self._generate_qr_svg(reference)
+        qr_png_base64 = self._generate_qr_png_base64(reference)
 
         # Prepare raw data for storage
         raw_data = {
             "qr_payload": reference,
-            "qr_svg": reference,
-            "qr_png_base64": reference,
+            "qr_svg": qr_svg,
+            "qr_png_base64": qr_png_base64,
             "qr_url": qr_api_url,
             "payment_page_url": payment_page_url,
-            "expires_at": (datetime.now(UTC) + timedelta(minutes=self.config.timeout_minutes)).isoformat(),
+            "expires_at": expires_at.isoformat(),
             "auto_complete_seconds": self.config.auto_complete_seconds,
         }
 
@@ -134,7 +131,7 @@ class StaticQRGateway(PaymentGateway):
     def get_status(self, reference: str) -> PaymentStatusResult:
         """
         Get payment status.
-        
+
         Checks:
         1. Webhook received (payment completed via user action)
         2. Auto-completion time reached (simulated payment)
@@ -205,7 +202,7 @@ class StaticQRGateway(PaymentGateway):
         complete_at = datetime.now(UTC) + timedelta(seconds=config.auto_complete_seconds)
 
         _pending_auto_complete[reference] = {
-            "complete_at": datetime.now(UTC) + timedelta(seconds=config.auto_complete_seconds),
+            "complete_at": complete_at,
             "completed": False,
         }
 

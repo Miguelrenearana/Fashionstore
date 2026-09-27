@@ -19,14 +19,6 @@ Map<String, dynamic> _readTokens() {
   throw StateError('design-tokens.json no encontrado (busqué en mobile/ y raíz)');
 }
 
-String _camel(String s) {
-  final parts = s.replaceAllMapped(
-    RegExp(r'[A-Z]'),
-    (m) => '_${m[0]!.toLowerCase()}',
-  ).split('_');
-  return parts.fold('', (acc, p) => acc + p[0].toUpperCase() + p.substring(1));
-}
-
 class _ShadowLayer {
   final double x, y, blur, spread;
   final int r, g, b;
@@ -40,7 +32,7 @@ List<_ShadowLayer> _parseShadow(String css) {
     if (m == null) {
       throw FormatException('Shadow no parseable: $part');
     }
-    final rgba = m![5]!.split(',').map((e) => e.trim()).toList();
+    final rgba = m[5]!.split(',').map((e) => e.trim()).toList();
     return _ShadowLayer(
       double.parse(m[1]!),
       double.parse(m[2]!),
@@ -193,7 +185,7 @@ void main() {
     final style = baseStyles[key]!;
     b.writeln('  static const TextStyle $name = TextStyle(');
     b.writeln('    fontSize: $size,');
-    b.writeln('    fontWeight: FontWeight.w${style.weight.index * 100},');
+    b.writeln('    fontWeight: FontWeight.w${style.weight.value},');
     b.writeln('    height: ${style.height},');
     b.writeln('    letterSpacing: ${style.letterSpacing},');
     b.writeln('  );');

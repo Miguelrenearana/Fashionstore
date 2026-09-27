@@ -1,33 +1,48 @@
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser, DbSession
 from app.core.exceptions import NotFoundError
 from app.models.catalog import GarmentVariant
-from app.models.user import Client
+from app.models.user import Client, User
 from app.schemas.ai import (
     AIChatRequest,
     AIChatResponse,
     AIReportRequest,
     AIReportResponse,
+    RecommendationItem,
 )
 from app.services.ai_service import ai_service
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-def _client_id(db, user) -> int:
+def _client_id(db: Session, user: User) -> int:
     client = db.query(Client).filter(Client.user_id == user.id).first()
     if not client:
         raise NotFoundError("Cliente no encontrado")
     return client.id
 
 
+def _require_admin(current: User) -> None:
+    """CU-32: solo A2 Administrador."""
+    if "ADMIN" not in [r.name for r in current.roles]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden generar reportes IA")
+
+
+def _first_image(variant: GarmentVariant) -> str | None:
+    """CU-30: imagen de la prenda para la tarjeta de recomendación."""
+    images = getattr(variant.garment, "images", None) if variant.garment else None
+    if images:
+        return images[0].url
+    return None
+
+
 # ============================================================
 # CU-30: Recomendaciones
 # ============================================================
 
-@router.get("/recommendations", response_model=list[dict])
+@router.get("/recommendations", response_model=list[RecommendationItem])
 def get_recommendations(
     db: DbSession,
     current: CurrentUser,
@@ -36,7 +51,8 @@ def get_recommendations(
     source: str = Query("similarity", pattern="^(similarity|history|trending)$"),
 ):
     """
-    Obtener recomendaciones personalizadas.
+    CU-30: recomendar productos considerando preferencias, historial,
+    temporada, categoría, talla y disponibilidad.
     - source=similarity: productos similares a source_variant_id
     - source=history: basado en historial de navegación del cliente
     - source=trending: productos tendencia
@@ -45,14 +61,13 @@ def get_recommendations(
 
     if source == "trending":
         results = ai_service.get_trending_products(db, limit=limit)
-        return results
-
-    if source == "history":
-        recs = ai_service.recommend_for_client(db, client_id=_client_id(db, current), source_variant_id=source_variant_id, limit=limit)
-        # Transformar a formato de respuesta
+    elif source == "history":
+        recs = ai_service.recommend_for_client(
+            db, client_id=client_id, source_variant_id=source_variant_id, limit=limit
+        )
         results = []
         for rec in recs:
-            variant = db.query(GarmentVariant).get(rec.suggested_variant_id)
+            variant = db.get(GarmentVariant, rec.suggested_variant_id)
             if variant and variant.garment:
                 results.append({
                     "variant_id": variant.id,
@@ -62,24 +77,29 @@ def get_recommendations(
                     "color_name": variant.color.name if variant.color else None,
                     "price": float(variant.price) if variant.price else 0,
                     "score": float(rec.score),
+                    "garment_image_url": _first_image(variant),
                 })
-        return results
+    else:  # similarity (default)
+        results = ai_service.get_recommendations_by_variant(db, source_variant_id, limit)
 
-    # similarity (default)
-    results = ai_service.get_recommendations_by_variant(db, source_variant_id, limit)
     return results
 
 
-@router.get("/recommendations/trending", response_model=list[dict])
+@router.get("/recommendations/trending", response_model=list[RecommendationItem])
 def get_trending_products(
     db: DbSession,
     limit: int = Query(10, ge=1, le=50),
 ):
     """Productos tendencia (más vistos/comprados)."""
-    return ai_service.get_trending_products(db, limit)
+    results = ai_service.get_trending_products(db, limit)
+    for item in results:
+        variant = db.get(GarmentVariant, item["variant_id"])
+        if variant:
+            item["garment_image_url"] = _first_image(variant)
+    return results
 
 
-@router.get("/recommendations/by-variant/{variant_id}", response_model=list[dict])
+@router.get("/recommendations/by-variant/{variant_id}", response_model=list[RecommendationItem])
 def get_recommendations_by_variant(
     variant_id: int,
     db: DbSession,
@@ -98,123 +118,76 @@ def log_view(variant_id: int, db: DbSession, current: CurrentUser):
 
 
 # ============================================================
-# CU-31: Asistente IA (Chat)
+# CU-31: Asistir al cliente mediante IA (Chat con AS3)
 # ============================================================
 
-class AIChatMessage(BaseModel):
-    role: str = Field(pattern="^(user|assistant|system)$")
-    content: str
-
-
-class AIChatRequest(BaseModel):
-    message: str
-    context: str | None = None
-    history: list[dict] = []
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=500, ge=1, le=2000)
-
-
-class AIChatResponse(BaseModel):
-    message: str
-    model: str
-    tokens_used: int | None = None
-
-
-@router.post("/chat", response_model=dict)
+@router.post("/chat", response_model=AIChatResponse)
 def ai_chat(
     request: AIChatRequest,
     db: DbSession,
     current: CurrentUser,
 ):
-    """Chat con asistente IA (Ollama local)."""
+    """
+    CU-31: el cliente introduce una consulta, el sistema la envía al
+    servicio de IA (AS3) y presenta la respuesta.
+    Acepta el contrato canónico `messages` y el shorthand `message`+`history`.
+    """
     try:
         result = ai_service.chat_with_context(
-            message=request.message,
+            message=request.last_user_message,
             context=request.context,
             history=request.history,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
         )
-        return {
-            "message": result.get("message", ""),
-            "model": result.get("model", "unknown"),
-            "tokens_used": result.get("tokens", 0),
-        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en chat IA: {str(e)}")
+        # EXCEPCION CU-31: "Servicio IA no disponible" / "Error de comunicación"
+        raise HTTPException(status_code=503, detail=f"Asistencia inteligente no disponible: {e}") from e
+
+    return AIChatResponse(
+        message=result.get("message", ""),
+        model=result.get("model", "unknown"),
+        tokens_used=result.get("tokens", 0),
+        finish_reason="stop" if result.get("done", True) else "length",
+    )
 
 
 # ============================================================
-# CU-32: Generar consultas y reportes mediante IA (SQL Generation)
+# CU-32: Generar consultas y reportes mediante IA (NL -> SQL)
 # ============================================================
 
-class AIReportRequest(BaseModel):
-    prompt: str = Field(min_length=5, max_length=2000)
-    max_rows: int = Field(default=100, ge=1, le=1000)
-    explain: bool = False
-
-
-class AIReportResponse(BaseModel):
-    columns: list[str]
-    rows: list[list[str | None]]
-    row_count: int
-    generated_sql: str | None = None
-    execution_time_ms: float
-
-
-@router.post("/reports/generate", response_model=dict)
+@router.post("/reports/generate", response_model=AIReportResponse)
 def generate_ai_report(
     request: AIReportRequest,
     db: DbSession,
     current: CurrentUser,
 ):
-    """
-    Generar reporte SQL desde lenguaje natural.
-    Solo ADMIN puede usar este endpoint.
-    """
-    # Verificar rol ADMIN
-    if "ADMIN" not in [r.name for r in current.roles]:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden generar reportes IA")
+    """CU-32: generar y ejecutar un reporte a partir de lenguaje natural. Solo A2."""
+    _require_admin(current)
 
     try:
-        result = ai_service.generate_ai_report(request.prompt, request.max_rows)
-        return {
-            "columns": result.get("columns", []),
-            "rows": result.get("rows", []),
-            "row_count": result.get("row_count", 0),
-            "generated_sql": result.get("generated_sql"),
-            "execution_time_ms": result.get("execution_time_ms", 0),
-        }
+        result = ai_service.execute_ai_report(request.prompt, request.max_rows)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
+        # EXCEPCION CU-32: "Solicitud no comprendida" / "Error de procesamiento"
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return AIReportResponse(**result)
 
 
 @router.post("/reports/explain")
 def explain_sql(
-    prompt: str,
     db: DbSession,
     current: CurrentUser,
+    prompt: str = Query(..., min_length=5, max_length=2000),
 ):
-    """Generar y explicar SQL sin ejecutar."""
-    if "ADMIN" not in [r.name for r in current.roles]:
-        raise HTTPException(status_code=403, detail="Solo administradores")
+    """CU-32: generar y explicar el SQL sin ejecutarlo. Solo A2."""
+    _require_admin(current)
 
     try:
         result = ai_service.generate_sql_query(prompt)
-        return {
-            "sql": result.get("sql"),
-            "explanation": result.get("explanation", ""),
-        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generando SQL: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return {"sql": result.get("sql"), "explanation": result.get("explanation", "")}
 
 
-# ============================================================
-# Helpers
-# ============================================================
-
-def _client_id(db, user) -> int:
-    client = db.query(Client).filter(Client.user_id == user.id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    return client.id

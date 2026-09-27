@@ -14,7 +14,24 @@ class AppToast {
     String? actionLabel,
     VoidCallback? onAction,
   }) {
-    final overlay = Overlay.of(context);
+    showVia(
+      Overlay.of(context),
+      message: message,
+      type: type,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
+  }
+
+  /// Variant for async callbacks: capture the [OverlayState] before awaiting
+  /// so no BuildContext has to be used across the async gap.
+  static void showVia(
+    OverlayState overlay, {
+    required String message,
+    ToastType type = ToastType.info,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     _current?.remove();
 
     final (bg, icon, fg) = switch (type) {

@@ -45,27 +45,21 @@ class RecommendationsController extends StateNotifier<RecommendationsState> {
   Future<void> load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // Use trending as default source to avoid "Variant not found" error
-      final dynamic res = await _api.get('/ai/recommendations?source=trending&limit=10');
-      // Backend returns list directly, not wrapped in {items: [...]}
-      final List<dynamic> data;
-      if (res is List) {
-        data = List<dynamic>.from(res);
-      } else if (res is Map && res['items'] is List) {
-        data = List<dynamic>.from(res['items'] as List);
-      } else {
-        data = const [];
-      }
-      final items = data
-          .map((e) => ProductRecommendation.fromJson(e as Map<String, dynamic>))
-          .toList();
-      state = state.copyWith(
-        items: items,
-        isLoading: false,
-        reason: res is Map ? res['reason'] as String? : null,
+      // `getList` porque el endpoint devuelve una lista JSON de primer nivel;
+      // `get` hacia `res.data as Map` y reventaba con una lista.
+      final data = await _api.getList(
+        '/ai/recommendations',
+        queryParameters: {'source': 'trending', 'limit': 10},
       );
+      final items = data
+          .whereType<Map<String, dynamic>>()
+          .map(ProductRecommendation.fromJson)
+          .toList();
+      state = state.copyWith(items: items, isLoading: false);
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
+    } on Object catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Error: $e');
     }
   }
 }
@@ -156,8 +150,22 @@ class _RecommendationsScreenState
                         child:
                             ProductCard(product: rec.product, onWishlist: null),
                       ),
+                      const SizedBox(height: 4),
+                      // La recomendacion viene por variante concreta, asi que se
+                      // informa talla y color: antes solo se mostraba el nombre.
+                      if (rec.sizeName != null || rec.colorName != null)
+                        Text(
+                          [
+                            if (rec.sizeName != null) 'Talla ${rec.sizeName}',
+                            if (rec.colorName != null) rec.colorName!,
+                          ].join(' - '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
                       if (rec.reason != null) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           '✦ ${rec.reason}',
                           maxLines: 1,

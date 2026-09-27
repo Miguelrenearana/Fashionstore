@@ -1,9 +1,11 @@
 import { Routes } from '@angular/router';
 import { AdminShellComponent } from './admin-shell.component';
 import { AdminUsersComponent } from './admin-users.component';
+import { AdminLocationsComponent } from './admin-locations.component';
 import { AdminCatalogConfigComponent } from './admin-catalog-config.component';
 import { AdminProductsComponent } from './admin-products.component';
 import { AdminInventoryComponent } from './admin-inventory.component';
+import { AdminReceptionComponent } from './admin-reception.component';
 import { AdminReportsComponent } from './admin-reports.component';
 import { AdminAiReportsComponent } from './admin-ai-reports.component';
 import { AdminPromotionsComponent } from './admin-promotions.component';
@@ -15,9 +17,11 @@ export const ADMIN_ROUTES: Routes = [
     children: [
       { path: '', redirectTo: 'users', pathMatch: 'full' },
       { path: 'users', component: AdminUsersComponent },
+      { path: 'locations', component: AdminLocationsComponent },
       { path: 'catalog', component: AdminCatalogConfigComponent },
       { path: 'products', component: AdminProductsComponent },
       { path: 'inventory', component: AdminInventoryComponent },
+      { path: 'reception', component: AdminReceptionComponent },
       { path: 'promotions', component: AdminPromotionsComponent },
       { path: 'reports', component: AdminReportsComponent },
       { path: 'reports/ai', component: AdminAiReportsComponent },

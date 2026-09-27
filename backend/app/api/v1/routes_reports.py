@@ -76,25 +76,6 @@ def get_indicators(
     return report_service.get_sales_indicators(start_date, end_date, branch_id)
 
 
-@router.post("/indicators", response_model=IndicatorsResponse)
-def post_indicators(
-    db: DbSession,
-    current: CurrentUser,
-    payload: IndicatorsRequest,
-):
-    """Obtener indicadores de ventas y stock (cuerpo JSON).
-
-    Solo accesible por administradores.
-    """
-    _require_admin(current)
-    report_service = get_report_service(db)
-    return report_service.get_sales_indicators(
-        start_date=payload.start_date,
-        end_date=payload.end_date,
-        branch_id=payload.branch_id,
-    )
-
-
 @router.get("/stock", response_model=LowStockResponse)
 def get_stock_indicators(
     db: DbSession,

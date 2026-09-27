@@ -42,6 +42,27 @@ class Reservation(Base, TimestampMixin):
             and self.expires_at.replace(tzinfo=UTC) < datetime.now(UTC)
         )
 
+    # --- Alias en camelCase que espera el cliente movil (CU-12) ---
+    @property
+    def items(self) -> list["ReservationDetail"]:
+        return self.details
+
+    @property
+    def total(self) -> float:
+        return float(self.total_amount or 0)
+
+    @property
+    def available_until(self) -> datetime:
+        return self.expires_at
+
+    @property
+    def reservation_code(self) -> str:
+        return self.pickup_code
+
+    @property
+    def branch_name(self) -> str | None:
+        return self.branch.name if self.branch else None
+
 
 class ReservationDetail(Base, TimestampMixin):
     __tablename__ = "reserva_detalle"
@@ -54,6 +75,40 @@ class ReservationDetail(Base, TimestampMixin):
 
     reservation = relationship("Reservation", back_populates="details")
     variant = relationship("GarmentVariant")
+
+    # --- Datos derivados para el cliente (CU-12) ---
+    @property
+    def garment_id(self) -> int | None:
+        return self.variant.garment_id if self.variant else None
+
+    @property
+    def product_name(self) -> str | None:
+        if self.variant is None or self.variant.garment is None:
+            return None
+        return self.variant.garment.name
+
+    @property
+    def size_name(self) -> str | None:
+        return self.variant.size.name if self.variant and self.variant.size else None
+
+    @property
+    def color_name(self) -> str | None:
+        return self.variant.color.name if self.variant and self.variant.color else None
+
+    @property
+    def image_url(self) -> str | None:
+        if self.variant is None or self.variant.garment is None:
+            return None
+        images = self.variant.garment.images
+        if not images:
+            return None
+        primary = next((i for i in images if i.is_primary), images[0])
+        return primary.url
+
+    @property
+    def available(self) -> int:
+        branch_id = self.reservation.branch_id if self.reservation else None
+        return self.variant.available_at(branch_id) if self.variant else 0
 
 
 class ReservationHistory(Base, TimestampMixin):

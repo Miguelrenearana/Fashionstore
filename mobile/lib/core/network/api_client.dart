@@ -159,6 +159,13 @@ class ApiClient {
     }
   }
 
+  /// Guarda solo el token. Se usa tras el registro, cuando ya se tiene el token
+  /// pero todavia no el usuario, y hace falta el token para pedir `/users/me`.
+  Future<void> setToken(String token) async {
+    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(key: _sessionKey, value: 'saved');
+  }
+
   Future<void> clearSession() async {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _sessionKey);

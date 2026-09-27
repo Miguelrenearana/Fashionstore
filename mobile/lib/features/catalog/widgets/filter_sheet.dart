@@ -10,11 +10,15 @@ class FilterSheet extends StatefulWidget {
     super.key,
     required this.filter,
     required this.categories,
+    required this.branches,
     required this.onApply,
   });
 
   final CatalogFilter filter;
   final List<Category> categories;
+
+  /// CU-14: sucursales para filtrar por disponibilidad.
+  final List<Branch> branches;
   final Future<void> Function(CatalogFilter) onApply;
 
   @override
@@ -23,6 +27,7 @@ class FilterSheet extends StatefulWidget {
 
 class _FilterSheetState extends State<FilterSheet> {
   late String? _categoryId;
+  late int? _branchId;
   late bool _inStockOnly;
   late String? _sortBy;
   final _sizes = <String>{};
@@ -35,6 +40,7 @@ class _FilterSheetState extends State<FilterSheet> {
   void initState() {
     super.initState();
     _categoryId = widget.filter.categoryId?.toString();
+    _branchId = widget.filter.branchId;
     _inStockOnly = widget.filter.inStockOnly;
     _sortBy = widget.filter.sortBy;
     _sizes.addAll(widget.filter.sizes);
@@ -42,13 +48,15 @@ class _FilterSheetState extends State<FilterSheet> {
   }
 
   void _apply() {
-    final filter = widget.filter.copyWith(
-      categoryId: _categoryId != null ? int.tryParse(_categoryId!) : null,
-      sizes: _sizes,
-      colors: _colors,
-      inStockOnly: _inStockOnly,
-      sortBy: _sortBy,
-    );
+    final filter = widget.filter
+        .copyWith(
+          categoryId: _categoryId != null ? int.tryParse(_categoryId!) : null,
+          sizes: _sizes,
+          colors: _colors,
+          inStockOnly: _inStockOnly,
+          sortBy: _sortBy,
+        )
+        .withBranch(_branchId);
     widget.onApply(filter);
     Navigator.pop(context);
   }
@@ -56,6 +64,7 @@ class _FilterSheetState extends State<FilterSheet> {
   void _clear() {
     setState(() {
       _categoryId = null;
+      _branchId = null;
       _inStockOnly = false;
       _sortBy = null;
       _sizes.clear();
@@ -112,9 +121,8 @@ class _FilterSheetState extends State<FilterSheet> {
                     for (final (value, label) in const [
                       ('price_asc', 'Precio menor'),
                       ('price_desc', 'Precio mayor'),
-                      ('newest', 'Novedades'),
-                      ('popular', 'Populares'),
-                      ('rating', 'Mejor valorados'),
+                      ('name_asc', 'Nombre A-Z'),
+                      ('name_desc', 'Nombre Z-A'),
                     ])
                       ChoiceChip(
                         label: Text(label),
@@ -166,6 +174,32 @@ class _FilterSheetState extends State<FilterSheet> {
                     ..addAll(v)),
                   multiSelect: true,
                 ),
+                const SizedBox(height: AppSpacing.x5),
+                const _SectionTitle('Sucursal'),
+                const SizedBox(height: AppSpacing.x2),
+                if (widget.branches.isEmpty)
+                  const Text(
+                    'No hay sucursales disponibles',
+                    style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                  )
+                else
+                  Wrap(
+                    spacing: AppSpacing.x2,
+                    runSpacing: AppSpacing.x2,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Todas'),
+                        selected: _branchId == null,
+                        onSelected: (_) => setState(() => _branchId = null),
+                      ),
+                      for (final b in widget.branches)
+                        ChoiceChip(
+                          label: Text(b.name),
+                          selected: _branchId == b.id,
+                          onSelected: (_) => setState(() => _branchId = b.id),
+                        ),
+                    ],
+                  ),
                 const SizedBox(height: AppSpacing.x5),
                 const _SectionTitle('Disponibilidad'),
                 SwitchListTile(

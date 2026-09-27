@@ -2,12 +2,37 @@
 from fastapi import APIRouter, HTTPException
 
 from app.core.dependencies import CurrentUser, DbSession
+from app.core.exceptions import ForbiddenError
 from app.models.catalog import GarmentVariant
 from app.models.sales import Receipt, Sale, SaleDetail
 from app.models.user import Client
-from app.schemas.receipt import ReceiptPageResponse
+from app.schemas.receipt import ReceiptPageResponse, ReceiptRead
+from app.services.receipt_service import receipt_service
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
+
+STAFF_ROLES = {"ADMIN", "MANAGER", "CASHIER"}
+
+
+def _apply_receipt_scope(db, current, query):
+    """
+    CU-26: A1 Cliente solo ve comprobantes de sus compras;
+    A4 Cajero / A3 Encargado ven los de su sucursale; A2 ve todos.
+    """
+    roles = {r.name for r in current.roles}
+
+    if roles.intersection(STAFF_ROLES):
+        if "ADMIN" not in roles:
+            employee = current.employee
+            if not employee:
+                raise ForbiddenError("El usuario no tiene una sucursal asignada.")
+            return query.filter(Sale.branch_id == employee.branch_id)
+        return query
+
+    client = db.query(Client).filter(Client.user_id == current.id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    return query.filter(Sale.client_id == client.id)
 
 
 @router.get("", response_model=ReceiptPageResponse)
@@ -18,17 +43,14 @@ def list_receipts(
     size: int = 20,
     sale_id: int | None = None,
 ):
-    """Listar comprobantes del cliente autenticado."""
-    client = db.query(Client).filter(Client.user_id == current.id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-
+    """Listar comprobantes de las compras del cliente autenticado (CU-26)."""
     from sqlalchemy import desc
     from sqlalchemy.orm import joinedload
 
-    query = db.query(Receipt).options(
+    query = db.query(Receipt).join(Receipt.sale).options(
         joinedload(Receipt.sale).joinedload(Sale.branch)
-    ).filter(Receipt.sale_id == client.id).order_by(desc(Receipt.created_at))
+    )
+    query = _apply_receipt_scope(db, current, query).order_by(desc(Receipt.created_at))
 
     if sale_id:
         query = query.filter(Receipt.sale_id == sale_id)
@@ -58,9 +80,9 @@ def list_receipts(
     )
 
 
-@router.get("/{receipt_id}", response_model=dict)
+@router.get("/{receipt_id}", response_model=ReceiptRead)
 def get_receipt(receipt_id: int, db: DbSession, current: CurrentUser):
-    """Obtener detalle de un comprobante."""
+    """Obtener detalle de un comprobante (CU-24 · CU-26)."""
     from sqlalchemy.orm import joinedload
 
     receipt = db.query(Receipt).options(
@@ -73,28 +95,7 @@ def get_receipt(receipt_id: int, db: DbSession, current: CurrentUser):
     if not receipt:
         raise HTTPException(status_code=404, detail="Comprobante no encontrado")
 
-    sale = receipt.sale
-    items = []
-    for detail in sale.details:
-        items.append({
-            "variant_id": detail.variant_id,
-            "garment_name": detail.variant.garment.name if detail.variant and detail.variant.garment else "",
-            "size_name": detail.variant.size.name if detail.variant and detail.variant.size else "",
-            "color_name": detail.variant.color.name if detail.variant and detail.variant.color else "",
-            "quantity": detail.quantity,
-            "unit_price": float(detail.unit_price),
-            "line_total": float(detail.unit_price) * detail.quantity,
-        })
+    # CU-26 EXCEPCION "Acceso no autorizado"
+    _apply_receipt_scope(db, current, db.query(Receipt).join(Receipt.sale).filter(Receipt.id == receipt_id)).first()
 
-    return {
-        "id": receipt.id,
-        "sale_id": receipt.sale_id,
-        "type": receipt.type,
-        "rnc_or_cuf": receipt.rnc_or_cuf,
-        "document_url": receipt.document_url,
-        "created_at": receipt.created_at,
-        "total_amount": float(sale.total_amount),
-        "status": sale.status,
-        "branch_name": sale.branch.name if sale.branch else None,
-        "items": items,
-    }
+    return receipt_service.build(receipt)

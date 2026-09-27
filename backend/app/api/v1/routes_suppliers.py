@@ -9,7 +9,7 @@ router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 manager_or_admin = require_roles("ADMIN", "MANAGER")
 
 
-@router.get("", response_model=list[SupplierRead])
+@router.get("", response_model=list[SupplierRead], dependencies=[Depends(manager_or_admin)])
 def list_suppliers(db: DbSession):
     return supplier_service.list(db)
 

@@ -48,6 +48,38 @@ class SaleDetail(Base, TimestampMixin):
     sale = relationship("Sale", back_populates="details")
     variant = relationship("GarmentVariant")
 
+    @property
+    def sku(self) -> str | None:
+        return self.variant.sku if self.variant else None
+
+    @property
+    def garment_id(self) -> int | None:
+        return self.variant.garment_id if self.variant else None
+
+    @property
+    def garment_name(self) -> str | None:
+        return self.variant.garment.name if self.variant and self.variant.garment else None
+
+    @property
+    def size_name(self) -> str | None:
+        return self.variant.size.name if self.variant and self.variant.size else None
+
+    @property
+    def color_name(self) -> str | None:
+        return self.variant.color.name if self.variant and self.variant.color else None
+
+    @property
+    def image_url(self) -> str | None:
+        """Primera imagen de la prenda, igual que en el carrito."""
+        if not self.variant or not self.variant.garment:
+            return None
+        images = getattr(self.variant.garment, "images", None) or []
+        for image in images:
+            url = getattr(image, "url", None)
+            if url:
+                return url
+        return None
+
 
 class SalePaymentStatus:
     PENDING = "PENDING"

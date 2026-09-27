@@ -8,6 +8,7 @@ class CatalogFilter {
   const CatalogFilter({
     this.search = '',
     this.categoryId,
+    this.branchId,
     this.minPrice,
     this.maxPrice,
     this.sizes = const {},
@@ -18,6 +19,9 @@ class CatalogFilter {
 
   final String search;
   final int? categoryId;
+
+  /// CU-14: sucursal seleccionada para consultar disponibilidad.
+  final int? branchId;
   final double? minPrice;
   final double? maxPrice;
   final Set<String> sizes;
@@ -28,6 +32,7 @@ class CatalogFilter {
   bool get hasActiveFilters =>
       search.isNotEmpty ||
       categoryId != null ||
+      branchId != null ||
       minPrice != null ||
       maxPrice != null ||
       sizes.isNotEmpty ||
@@ -37,6 +42,7 @@ class CatalogFilter {
   CatalogFilter copyWith({
     String? search,
     int? categoryId,
+    int? branchId,
     double? minPrice,
     double? maxPrice,
     Set<String>? sizes,
@@ -47,6 +53,7 @@ class CatalogFilter {
     return CatalogFilter(
       search: search ?? this.search,
       categoryId: categoryId ?? this.categoryId,
+      branchId: branchId ?? this.branchId,
       minPrice: minPrice ?? this.minPrice,
       maxPrice: maxPrice ?? this.maxPrice,
       sizes: sizes ?? this.sizes,
@@ -55,6 +62,19 @@ class CatalogFilter {
       sortBy: sortBy ?? this.sortBy,
     );
   }
+
+  /// Unlike [copyWith], this allows clearing the branch (back to "all branches").
+  CatalogFilter withBranch(int? branchId) => CatalogFilter(
+        search: search,
+        categoryId: categoryId,
+        branchId: branchId,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        sizes: sizes,
+        colors: colors,
+        inStockOnly: inStockOnly,
+        sortBy: sortBy,
+      );
 }
 
 class CatalogState {
@@ -67,6 +87,7 @@ class CatalogState {
     this.total = 0,
     this.filter = const CatalogFilter(),
     this.categories = const [],
+    this.branches = const [],
   });
 
   final List<Product> items;
@@ -78,6 +99,9 @@ class CatalogState {
   final CatalogFilter filter;
   final List<Category> categories;
 
+  /// CU-14: sucursales disponibles para filtrar por disponibilidad.
+  final List<Branch> branches;
+
   CatalogState copyWith({
     List<Product>? items,
     bool? isLoading,
@@ -87,6 +111,7 @@ class CatalogState {
     int? total,
     CatalogFilter? filter,
     List<Category>? categories,
+    List<Branch>? branches,
   }) {
     return CatalogState(
       items: items ?? this.items,
@@ -97,6 +122,7 @@ class CatalogState {
       total: total ?? this.total,
       filter: filter ?? this.filter,
       categories: categories ?? this.categories,
+      branches: branches ?? this.branches,
     );
   }
 }
@@ -104,9 +130,32 @@ class CatalogState {
 class CatalogController extends StateNotifier<CatalogState> {
   CatalogController(this._api) : super(const CatalogState()) {
     _loadCategories();
+    loadBranches();
   }
 
   final ApiClient _api;
+
+  /// CU-14: sucursar con existencia para consultar disponibilidad.
+  Future<void> loadBranches() async {
+    try {
+      final list = await _api.getList('/locations/branches');
+      state = state.copyWith(
+        branches: list
+            .map((e) => Branch.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+    } catch (_) {
+      // El filtro por sucursal es opcional; el catalogo sigue funcionando.
+    }
+  }
+
+  /// CU-14: disponibilidad por sucursal de una prenda.
+  Future<List<VariantAvailability>> availability(int garmentId) async {
+    final list = await _api.getList('/catalog/$garmentId/availability');
+    return list
+        .map((e) => VariantAvailability.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   Future<void> _loadCategories() async {
     try {
@@ -120,22 +169,28 @@ class CatalogController extends StateNotifier<CatalogState> {
     }
   }
 
+  /// CU-13/CU-14: parametros de consulta derivados del filtro activo.
+  Map<String, dynamic> _queryFor(int page) {
+    final f = state.filter;
+    return {
+      'page': page,
+      'size': 24,
+      if (f.search.isNotEmpty) 'search': f.search,
+      if (f.categoryId != null) 'category_id': f.categoryId,
+      if (f.branchId != null) 'branch_id': f.branchId,
+      if (f.minPrice != null) 'min_price': f.minPrice,
+      if (f.maxPrice != null) 'max_price': f.maxPrice,
+      if (f.sizes.isNotEmpty) 'sizes': f.sizes.toList(),
+      if (f.colors.isNotEmpty) 'colors': f.colors.toList(),
+      if (f.inStockOnly) 'in_stock': true,
+      if (f.sortBy != null) 'sort_by': f.sortBy,
+    };
+  }
+
   Future<void> loadFirstPage() async {
     state = state.copyWith(isLoading: true, error: null, page: 0);
-    final f = state.filter;
     try {
-      final res = await _api.get('/catalog', queryParameters: {
-        'page': 0,
-        'size': 24,
-        if (f.search.isNotEmpty) 'search': f.search,
-        if (f.categoryId != null) 'category_id': f.categoryId,
-        if (f.minPrice != null) 'min_price': f.minPrice,
-        if (f.maxPrice != null) 'max_price': f.maxPrice,
-        if (f.sizes.isNotEmpty) 'sizes': f.sizes.join(','),
-        if (f.colors.isNotEmpty) 'colors': f.colors.join(','),
-        if (f.inStockOnly) 'in_stock': true,
-        if (f.sortBy != null) 'sort_by': f.sortBy,
-      });
+      final res = await _api.get('/catalog', queryParameters: _queryFor(1));
       final pageData = CatalogPage.fromJson(_asPage(res));
       state = state.copyWith(
         items: pageData.items,
@@ -153,10 +208,10 @@ class CatalogController extends StateNotifier<CatalogState> {
     if (state.isLoading || state.page + 1 >= state.totalPages) return;
     state = state.copyWith(isLoading: true);
     try {
-      final res = await _api.get('/catalog', queryParameters: {
-        'page': state.page + 1,
-        'size': 24,
-      });
+      final res = await _api.get(
+        '/catalog',
+        queryParameters: _queryFor(state.page + 2), // backend 1-based
+      );
       final pageData = CatalogPage.fromJson(_asPage(res));
       state = state.copyWith(
         items: [...state.items, ...pageData.items],
@@ -172,6 +227,12 @@ class CatalogController extends StateNotifier<CatalogState> {
 
   Future<void> applyFilter(CatalogFilter filter) async {
     state = state.copyWith(filter: filter);
+    await loadFirstPage();
+  }
+
+  /// CU-14: filtra el catalogo por la disponibilidad en una sucursal.
+  Future<void> selectBranch(int? branchId) async {
+    state = state.copyWith(filter: state.filter.withBranch(branchId));
     await loadFirstPage();
   }
 

@@ -15,7 +15,10 @@ import { UiButtonComponent } from '@shared/ui/button';
         punto de venta y reportes con IA para tu negocio.
       </p>
       <div class="cta flex justify-center gap-4 flex-wrap">
-        <ui-button variant="primary" size="lg" routerLink="/auth">
+        <ui-button variant="primary" size="lg" routerLink="/client/catalog">
+          Tienda en línea
+        </ui-button>
+        <ui-button variant="outline" size="lg" routerLink="/auth">
           Acceso restringido
         </ui-button>
         <ui-button variant="outline" size="lg" class="cursor-pointer" (click)="openFitting()">

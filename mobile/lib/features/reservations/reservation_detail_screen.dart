@@ -132,7 +132,7 @@ class _ReservationDetailScreenState
                       color: AppColors.textMuted,
                     ),
                   ),
-                  title: Text(item.name),
+                  title: Text(item.name ?? 'Prenda #${item.variantId}'),
                   subtitle: Text(
                     [item.variantSize, item.variantColor]
                         .where((e) => e != null)
@@ -141,7 +141,7 @@ class _ReservationDetailScreenState
                   ),
                   isThreeLine: false,
                   trailing: Text(
-                    'x${item.quantity} · ${_fmt(item.price * item.quantity)}',
+                    'x${item.quantity} · ${_fmt(item.subtotal)}',
                     style: theme.textTheme.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -249,13 +249,23 @@ class _ReservationDetailScreenState
           _TimelineRow(
             icon: Icons.verified_user,
             label: 'Prendas preparadas',
-            done: reservation.status.index >= ReservationStatus.ready.index,
+            done: reservation.status == ReservationStatus.prepared ||
+                reservation.status == ReservationStatus.inTrial ||
+                reservation.status == ReservationStatus.completed,
           ),
           _TimelineRow(
             icon: Icons.shopping_bag,
             label: 'Recogida en tienda',
-            done: reservation.status == ReservationStatus.pickedUp,
+            done: reservation.status == ReservationStatus.completed,
           ),
+          if (reservation.status.isFinal && reservation.status != ReservationStatus.completed)
+            _TimelineRow(
+              icon: reservation.status == ReservationStatus.expired
+                  ? Icons.timer_off_outlined
+                  : Icons.cancel_outlined,
+              label: reservation.status.label,
+              done: true,
+            ),
         ],
       ),
     );

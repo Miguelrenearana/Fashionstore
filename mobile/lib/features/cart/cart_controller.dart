@@ -8,34 +8,33 @@ class CartState {
   const CartState({
     this.items = const [],
     this.isLoading = false,
-    this.couponCode,
-    this.discount = 0,
+    this.serverTotal = 0,
     this.error,
   });
 
   final List<CartItem> items;
   final bool isLoading;
-  final String? couponCode;
-  final double discount;
+
+  /// Total que calcula el backend. Es la cifra que se cobra de verdad: usarla
+  /// evita mostrar al cliente un importe distinto al de la factura.
+  final double serverTotal;
   final String? error;
 
   double get subtotal => items.fold(0, (sum, item) => sum + item.subtotal);
-  double get shipping => subtotal >= 999 || items.isEmpty ? 0 : 99;
-  double get total => (subtotal - discount + shipping).clamp(0, double.infinity);
+  double get total => serverTotal > 0 ? serverTotal : subtotal;
   int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
+  bool get isEmpty => items.isEmpty;
 
   CartState copyWith({
     List<CartItem>? items,
     bool? isLoading,
-    String? couponCode,
-    double? discount,
+    double? serverTotal,
     String? error,
   }) {
     return CartState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
-      couponCode: couponCode ?? this.couponCode,
-      discount: discount ?? this.discount,
+      serverTotal: serverTotal ?? this.serverTotal,
       error: error,
     );
   }
@@ -52,10 +51,15 @@ class CartController extends StateNotifier<CartState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final res = await _api.get('/cart');
-      final items = (res['items'] as List? ?? const [])
+      // El backend llama `details` a las lineas, no `items`.
+      final items = (res['details'] as List? ?? const [])
           .map((e) => CartItem.fromJson(e as Map<String, dynamic>))
           .toList();
-      state = state.copyWith(items: items, isLoading: false);
+      state = state.copyWith(
+        items: items,
+        serverTotal: (res['total'] as num?)?.toDouble() ?? 0,
+        isLoading: false,
+      );
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
     }
@@ -77,20 +81,6 @@ class CartController extends StateNotifier<CartState> {
   Future<void> removeItem(int variantId) async {
     await _api.delete('/cart/items/$variantId');
     await load();
-  }
-
-  Future<void> applyCoupon(String code) async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      final res = await _api.post('/cart/coupon', data: {'code': code});
-      state = state.copyWith(
-        couponCode: code,
-        discount: (res['discount'] as num?)?.toDouble() ?? 0,
-        isLoading: false,
-      );
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-    }
   }
 
   Future<void> clear() async {

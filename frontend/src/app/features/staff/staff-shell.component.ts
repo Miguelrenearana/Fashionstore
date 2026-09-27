@@ -11,8 +11,10 @@ import { AuthService } from '@core/auth/auth.service';
       <aside class="sidebar">
         <h2 class="title">Personal de sucursal</h2>
         <nav class="nav" aria-label="Navegación de staff">
-          <a routerLink="reservations" routerLinkActive="active" class="nav-link">Reservas</a>
-          <a routerLink="/pos" routerLinkActive="active" class="nav-link">Punto de venta (POS)</a>
+          <a routerLink="reservations" routerLinkActive="active" class="nav-link">Reservas (CU-17 · CU-18)</a>
+          <a routerLink="inventory" routerLinkActive="active" class="nav-link">Existencias (CU-27 · CU-28)</a>
+          <a routerLink="reception" routerLinkActive="active" class="nav-link">Recepción de productos (CU-29)</a>
+          <a routerLink="pos" routerLinkActive="active" class="nav-link">Punto de venta (CU-23 · CU-24)</a>
         </nav>
         <p class="role">{{ auth.roles().join(', ') || 'Sin rol' }}</p>
       </aside>

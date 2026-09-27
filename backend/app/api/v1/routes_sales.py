@@ -54,7 +54,7 @@ def get_receipt(db: DbSession, sale_id: int, current: CurrentUser):
     receipt = receipt_service.get_for_sale(db, sale_id)
     if not receipt:
         raise NotFoundError("No comprobante issued for this sale yet (pay first).")
-    return receipt
+    return receipt_service.build(receipt)
 
 
 @router.get("", response_model=list[SaleRead])

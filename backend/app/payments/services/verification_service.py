@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class VerificationService:
     """
     Service for automatic payment verification.
-    
+
     Handles:
     - Webhook verification and processing
     - Auto-completion checking
@@ -36,7 +36,7 @@ class VerificationService:
     def process_webhook(self, payload: dict, signature: str) -> dict:
         """
         Process incoming webhook notification.
-        
+
         Validates signature, updates payment status, triggers side effects.
         """
         # Verify signature
@@ -56,6 +56,9 @@ class VerificationService:
             payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
             if not payment:
                 return {"success": False, "error": "Payment not found"}
+
+            if amount is not None and abs(float(amount) - float(payment.amount)) > 0.01:
+                return {"success": False, "error": "Amount does not match the payment"}
 
             if payment.status == "COMPLETED":
                 return {"success": True, "message": "Already completed"}
@@ -92,7 +95,7 @@ class VerificationService:
     def process_auto_complete(self, reference: str) -> bool:
         """
         Process auto-completion for a payment.
-        
+
         Called by background worker when auto-complete time is reached.
         """
         db = SessionLocal()
@@ -129,7 +132,7 @@ class VerificationService:
     def check_timeouts(self) -> int:
         """
         Check for expired payments and mark as TIMEOUT.
-        
+
         Returns number of payments timed out.
         """
         db = SessionLocal()

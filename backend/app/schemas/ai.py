@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common import ORMModel
 
@@ -39,12 +39,50 @@ class AIChatRequest(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=500, ge=1, le=2000)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy_single_message(cls, data: Any) -> Any:
+        """
+        Acepta tambien el contrato en singular que usan los clientes
+        (CU-31): {"message": "...", "history": [{"role","content"}]}.
+        Se normaliza a `messages` para no duplicar el esquema.
+        """
+        if not isinstance(data, dict):
+            return data
+        if "messages" in data:
+            return data
+
+        message = data.get("message")
+        if not isinstance(message, str) or not message.strip():
+            raise ValueError("Debe enviar 'messages' o 'message' con la consulta del cliente.")
+
+        messages: list[dict] = []
+        for entry in data.get("history") or []:
+            if isinstance(entry, dict) and entry.get("role") and entry.get("content") is not None:
+                messages.append({"role": entry["role"], "content": entry["content"]})
+        messages.append({"role": "user", "content": message})
+
+        normalized = {k: v for k, v in data.items() if k not in {"message", "history"}}
+        normalized["messages"] = messages
+        return normalized
+
+    @property
+    def last_user_message(self) -> str:
+        for msg in reversed(self.messages):
+            if msg.role == "user":
+                return msg.content
+        return self.messages[-1].content
+
+    @property
+    def history(self) -> list[dict]:
+        return [{"role": m.role, "content": m.content} for m in self.messages[:-1]]
+
 
 class AIChatResponse(BaseModel):
     message: str
     tokens_used: int | None = None
     model: str
-    finish_reason: str
+    finish_reason: str = "stop"
 
 
 # ============================================================

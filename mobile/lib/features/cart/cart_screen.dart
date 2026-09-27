@@ -16,14 +16,6 @@ class CartScreen extends ConsumerStatefulWidget {
 }
 
 class _CartScreenState extends ConsumerState<CartScreen> {
-  final _couponController = TextEditingController();
-
-  @override
-  void dispose() {
-    _couponController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(cartControllerProvider);
@@ -59,25 +51,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                             onRemove: () => notifier.removeItem(item.variantId),
                           ),
                       ];
-                      final summary = Column(
-                        children: [
-                          CouponCard(
-                            controller: _couponController,
-                            couponCode: state.couponCode,
-                            onApply: () {
-                              final code = _couponController.text.trim();
-                              if (code.isNotEmpty) notifier.applyCoupon(code);
-                            },
-                          ),
-                          const SizedBox(height: AppSpacing.x4),
-                          OrderSummary(
-                            subtotal: state.subtotal,
-                            shipping: state.shipping,
-                            discount: state.discount,
-                            total: state.total,
-                            onCheckout: () => context.go('/checkout'),
-                          ),
-                        ],
+                      final summary = OrderSummary(
+                        subtotal: state.subtotal,
+                        total: state.total,
+                        onCheckout: () => context.go('/checkout'),
                       );
 
                       if (isWide) {
@@ -94,8 +71,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         children: [
                           ...items,
                           const SizedBox(height: AppSpacing.x4),
-                          _couponInline(),
-                          const SizedBox(height: AppSpacing.x4),
                           summary,
                         ],
                       );
@@ -104,40 +79,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _couponInline() {
-    final state = ref.watch(cartControllerProvider);
-    return Wrap(
-      spacing: AppSpacing.x2,
-      runSpacing: AppSpacing.x2,
-      children: [
-        SizedBox(
-          width: 220,
-          child: AppTextField(
-            controller: _couponController,
-            hintText: 'Código de cupón',
-          ),
-        ),
-        AppButton(
-          label: 'Aplicar',
-          variant: AppButtonVariant.outline,
-          expand: false,
-          onPressed: () {
-            final code = _couponController.text.trim();
-            if (code.isNotEmpty) {
-              ref.read(cartControllerProvider.notifier).applyCoupon(code);
-            }
-          },
-        ),
-        if (state.couponCode != null)
-          AppBadge(
-            label: 'Cupón ${state.couponCode} aplicado',
-            variant: AppBadgeVariant.success,
-            icon: Icons.redeem,
-          ),
-      ],
     );
   }
 }
@@ -310,77 +251,24 @@ class _MiniStepper extends StatelessWidget {
   }
 }
 
-class CouponCard extends StatelessWidget {
-  const CouponCard({
-    super.key,
-    required this.controller,
-    required this.couponCode,
-    required this.onApply,
-  });
-
-  final TextEditingController controller;
-  final String? couponCode;
-  final VoidCallback onApply;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Cupón de descuento',
-              style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: AppSpacing.x3),
-          if (couponCode != null)
-            AppBadge(
-              label: 'Cupón $couponCode aplicado',
-              variant: AppBadgeVariant.success,
-              icon: Icons.redeem,
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: controller,
-                    hintText: 'Ingresa tu código',
-                    prefixIcon: Icons.confirmation_number_outlined,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.x2),
-                AppButton(
-                  label: 'Aplicar',
-                  variant: AppButtonVariant.outline,
-                  expand: false,
-                  onPressed: onApply,
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class OrderSummary extends StatelessWidget {
   const OrderSummary({
     super.key,
     required this.subtotal,
-    required this.shipping,
-    required this.discount,
     required this.total,
     required this.onCheckout,
   });
 
   final double subtotal;
-  final double shipping;
-  final double discount;
   final double total;
   final VoidCallback onCheckout;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // El backend no cobra envio ni admite cupones, asi que el total que se
+    // muestra es exactamente el que se va a facturar.
+    final matchesServer = (total - subtotal).abs() < 0.01;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -389,18 +277,6 @@ class OrderSummary extends StatelessWidget {
               style: theme.textTheme.titleSmall),
           const SizedBox(height: AppSpacing.x4),
           _row(theme, 'Subtotal', _fmt(subtotal)),
-          const SizedBox(height: AppSpacing.x2),
-          _row(
-            theme,
-            'Envío',
-            subtotal >= 999 ? 'GRATIS' : _fmt(shipping),
-            color: subtotal >= 999 ? AppColors.success : null,
-          ),
-          if (discount > 0) ...[
-            const SizedBox(height: AppSpacing.x2),
-            _row(theme, 'Descuento', '-${_fmt(discount)}',
-                color: AppColors.success),
-          ],
           const Divider(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -415,6 +291,14 @@ class OrderSummary extends StatelessWidget {
               ),
             ],
           ),
+          if (!matchesServer) ...[
+            const SizedBox(height: AppSpacing.x2),
+            Text(
+              'El total incluye ajustes aplicados en el servidor.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
           const SizedBox(height: AppSpacing.x4),
           AppButton(
             label: 'Proceder al pago',

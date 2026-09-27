@@ -7,7 +7,7 @@ from app.services.reception_service import reception_service
 
 router = APIRouter(prefix="/receptions", tags=["receptions"])
 
-branch_manager = require_roles("ADMIN", "MANAGER", "BRANCH_MANAGER")
+branch_manager = require_roles("ADMIN", "MANAGER")
 
 
 @router.post("", response_model=ReceptionFullRead, dependencies=[Depends(branch_manager)])

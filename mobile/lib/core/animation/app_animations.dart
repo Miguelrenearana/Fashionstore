@@ -41,7 +41,7 @@ class AppAnimations {
       onTapCancel: () => {},
       child: AnimatedScale(
         scale: 1.0,
-        duration: Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 100),
         curve: Curves.easeOut,
         child: child,
       ),
@@ -51,8 +51,8 @@ class AppAnimations {
   // Shimmer
   static Widget shimmer({required Widget child}) {
     return ShaderMask(
-      shaderCallback: (bounds) => LinearGradient(
-        colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0xFFBDBDBD), Color(0xFFEEEEEE), Color(0xFFBDBDBD)],
         stops: [0.1, 0.5, 0.9],
         transform: GradientRotation(0.5),
       ).createShader(bounds),

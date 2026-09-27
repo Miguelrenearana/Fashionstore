@@ -97,6 +97,9 @@ class CatalogVariantRead(ORMModel):
     price: float
     size_name: str
     color_name: str
+    # CU-14: unidades disponibles (en todas las sucursales o en la filtrada).
+    stock: int = 0
+    available: int = 0
 
 
 class ArVariantRead(ORMModel):
@@ -104,6 +107,29 @@ class ArVariantRead(ORMModel):
     sku: str
     size_name: str
     color_name: str
+
+
+class BranchStockRead(BaseModel):
+    """Existencias de una variante en una sucursal (CU-14)."""
+
+    branch_id: int
+    branch_name: str | None = None
+    quantity: int = 0
+    reserved_quantity: int = 0
+    available: int = 0
+
+
+class BranchAvailabilityRead(BaseModel):
+    """Disponibilidad de una variante desglosada por sucursal (CU-14)."""
+
+    variant_id: int
+    sku: str
+    price: float
+    size_name: str | None = None
+    color_name: str | None = None
+    total_available: int = 0
+    stock: int = 0
+    branches: list[BranchStockRead] = []
 
 
 class ArConfigRead(ORMModel):

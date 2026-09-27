@@ -214,13 +214,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Future<void> _openFilters(BuildContext context) {
+    final state = ref.read(catalogControllerProvider);
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => FilterSheet(
-        filter: ref.read(catalogControllerProvider).filter,
-        categories: ref.read(catalogControllerProvider).categories,
+        filter: state.filter,
+        categories: state.categories,
+        branches: state.branches,
         onApply: (filter) async {
           await ref
               .read(catalogControllerProvider.notifier)

@@ -19,19 +19,25 @@ export const routes: Routes = [
     path: 'admin',
     loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
     canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['ADMIN', 'MANAGER'] },
+    data: { roles: ['ADMIN'] },
   },
   {
     path: 'staff',
     loadChildren: () => import('./features/staff/staff.routes').then((m) => m.STAFF_ROUTES),
     canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['ADMIN', 'MANAGER', 'BRANCH_MANAGER', 'CASHIER'] },
+    data: { roles: ['ADMIN', 'MANAGER'] },
   },
   {
     path: 'pos',
     loadChildren: () => import('./features/pos/pos.routes').then((m) => m.POS_ROUTES),
     canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['ADMIN', 'MANAGER', 'BRANCH_MANAGER', 'CASHIER'] },
+    data: { roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
+  },
+  {
+    path: 'client',
+    loadChildren: () => import('./features/client/client.routes').then((m) => m.CLIENT_ROUTES),
+    canActivate: [AuthGuard],
+    data: { roles: ['CLIENT'] },
   },
   { path: '**', redirectTo: '' },
 ];

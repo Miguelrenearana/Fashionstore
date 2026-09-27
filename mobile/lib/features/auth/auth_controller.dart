@@ -39,7 +39,7 @@ class AuthController extends StateNotifier<AuthState> {
     if (await _api.hasSession()) {
       try {
         final res = await _api.get('/users/me');
-        state = state.copyWith(user: User.fromJson(res as Map<String, dynamic>));
+        state = state.copyWith(user: User.fromJson(res));
       } catch (_) {
         await _api.clearSession();
       }
@@ -65,7 +65,7 @@ class AuthController extends StateNotifier<AuthState> {
       
       // Ahora obtener datos del usuario (el interceptor ya enviará el token)
       final userRes = await _api.get('/users/me');
-      final user = User.fromJson(userRes as Map<String, dynamic>);
+      final user = User.fromJson(userRes);
       
       // Actualizar sesión con datos reales del usuario
       await _api.saveSession(AuthSession(
@@ -80,6 +80,9 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// CU-05: el alta de clientes es `POST /auth/register` (devuelve token).
+  /// Antes se llamaba a `POST /users/`, que es el alta de personal y exige rol
+  /// ADMIN, por lo que el registro desde la app respondia 403 siempre.
   Future<void> register({
     required String email,
     required String password,
@@ -87,21 +90,38 @@ class AuthController extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await _api.post('/users/', data: {
+      final parts = _splitName(fullName);
+      final res = await _api.post('/auth/register', data: {
         'email': email,
         'password': password,
-        'full_name': fullName,
-        'role': 'client',
+        'first_name': parts.$1,
+        'last_name': parts.$2,
       });
-      final id = (res['id'] ?? 0) as int;
-      state = state.copyWith(
-        user: User(id: id, email: email, fullName: fullName, role: 'client'),
-        isLoading: false,
-      );
+      // El registro ya devuelve un token utilizable: se guarda la sesion con el
+      // en vez de pedir un segundo login.
+      final token = res['access_token'] as String?;
+      if (token != null) {
+        await _api.setToken(token);
+      }
+      final userRes = await _api.get('/users/me');
+      final user = User.fromJson(userRes);
+      if (token != null) {
+        await _api.saveSession(AuthSession(accessToken: token, user: user));
+      }
+      state = state.copyWith(user: user, isLoading: false);
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
       rethrow;
     }
+  }
+
+  /// El backend exige `first_name` y `last_name` por separado.
+  static (String, String) _splitName(String fullName) {
+    final clean = fullName.trim();
+    final parts = clean.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return ('Cliente', 'Nuevo');
+    if (parts.length == 1) return (parts.first, parts.first);
+    return (parts.first, parts.sublist(1).join(' '));
   }
 
   Future<void> logout() async {
@@ -109,12 +129,29 @@ class AuthController extends StateNotifier<AuthState> {
     state = const AuthState();
   }
 
+  /// CU-05: `PATCH /clients/me` recibe `first_name`/`last_name`/`phone` y
+  /// devuelve el perfil del cliente plano (antes se leia `res['user']`).
   Future<void> updateProfile(User user) async {
+    final parts = _splitName(user.fullName);
     final res = await _api.patch('/clients/me', data: {
-      'full_name': user.fullName,
+      'first_name': parts.$1,
+      'last_name': parts.$2,
       'phone': user.phone,
     });
-    state = state.copyWith(user: User.fromJson(res['user'] as Map<String, dynamic>));
+    final profile = res['user'] as Map<String, dynamic>? ?? res;
+    state = state.copyWith(
+      user: User(
+        id: user.id,
+        email: profile['email'] as String? ?? user.email,
+        fullName: [
+          profile['first_name'] as String?,
+          profile['last_name'] as String?,
+        ].whereType<String>().where((p) => p.isNotEmpty).join(' '),
+        role: user.role,
+        phone: profile['phone'] as String?,
+        avatarUrl: user.avatarUrl,
+      ),
+    );
   }
 }
 

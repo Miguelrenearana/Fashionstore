@@ -84,7 +84,6 @@ class TestCU33ReportesIndicadores:
             return sale.id
         finally:
             db.close()
-        return sale_id
 
     def _get_admin_token(self):
         """Get a valid admin token."""
@@ -98,7 +97,7 @@ class TestCU33ReportesIndicadores:
     def test_get_sales_indicators(self, client):
         """Test obtener indicadores de ventas."""
         # Create a sale first
-        sale_id = self._create_sale(Decimal("150.00"))
+        self._create_sale(Decimal("150.00"))
 
         r = client.post(
             "/api/v1/reports/indicators",
@@ -124,11 +123,21 @@ class TestCU33ReportesIndicadores:
 
     def test_get_stock_indicators(self, client):
         """Test obtener indicadores de stock."""
-        # Create inventory with low stock
+        # Dejar la variante 1 en stock bajo. Una sola fila por
+        # (variant_id, branch_id): el inventario tiene constraint unico.
         db = SessionLocal()
         try:
-            inv = Inventory(branch_id=1, variant_id=1, quantity=5, reserved_quantity=0)
-            db.add(inv)
+            inv = (
+                db.query(Inventory)
+                .filter(Inventory.branch_id == 1, Inventory.variant_id == 1)
+                .first()
+            )
+            if inv is None:
+                inv = Inventory(branch_id=1, variant_id=1, quantity=5, reserved_quantity=0)
+                db.add(inv)
+            else:
+                inv.quantity = 5
+                inv.reserved_quantity = 0
             db.commit()
         finally:
             db.close()
@@ -186,11 +195,11 @@ class TestCU34BitacoraTrazabilidad:
         )
         assert r.status_code == 200
         data = r.json()
-        assert "items" in r.json()
-        assert "total" in r.json()
-        assert "page" in r.json()
-        assert "size" in r.json()
-        assert "pages" in r.json()
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "size" in data
+        assert "pages" in data
 
     def test_audit_log_filters(self, client):
         """Test filtros de bitácora."""
@@ -216,13 +225,13 @@ class TestCU34BitacoraTrazabilidad:
         )
         assert r.status_code == 200
         data = r.json()
-        assert all(item["action"] == "CREATE" for item in r.json()["items"])
+        assert all(item["action"] == "CREATE" for item in data["items"])
 
         # Filtrar por entidad
         r = client.get("/api/v1/reports/audit-log?entity=Sale", headers={"Authorization": f"Bearer {create_access_token(subject='1', roles=['ADMIN'])}"})
         assert r.status_code == 200
         data = r.json()
-        assert all(item["entity"] == "Sale" for item in r.json()["items"])
+        assert all(item["entity"] == "Sale" for item in data["items"])
 
 
 class TestCU35ConsolidadoVentasInventario:

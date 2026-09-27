@@ -138,3 +138,91 @@ def test_payment_initiate_confirm_and_refund(client, admin_headers):
 
     r = client.get(f"/api/v1/sales/{sale_id}", headers=admin_headers)
     assert r.json()["status"] == "REFUNDED"
+
+
+# --------------------------------------------------------------------------- #
+# Contrato con el cliente movil (CU-12)
+# --------------------------------------------------------------------------- #
+
+VALID_STATUSES = {"PENDING", "PREPARED", "IN_TRIAL", "COMPLETED", "CANCELLED", "EXPIRED"}
+
+
+def _create_reservation(client, client_headers, variant_id=1):
+    client.post(
+        "/api/v1/cart/items",
+        json={"variant_id": variant_id, "quantity": 1},
+        headers=client_headers,
+    )
+    r = client.post("/api/v1/cart/checkout", json={"branch_id": 1}, headers=client_headers)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_reservation_status_is_always_uppercase(client, client_headers):
+    """El movil compara contra los valores exactos; no puede haber variantes."""
+    reservation = _create_reservation(client, client_headers)
+    r = client.get("/api/v1/reservations/me", headers=client_headers)
+    assert r.status_code == 200
+    for item in r.json():
+        assert item["status"] in VALID_STATUSES
+    assert reservation["status"] == "PENDING"
+
+
+def test_reservation_exposes_mobile_aliases(client, client_headers):
+    """El movil lee items/total/available_until/reservation_code/branch_name."""
+    reservation = _create_reservation(client, client_headers)
+    body = reservation
+
+    assert body["items"] == body["details"]
+    assert body["total"] == body["total_amount"]
+    assert body["available_until"] == body["expires_at"]
+    assert body["reservation_code"] == body["pickup_code"]
+    assert body["branch_name"]
+    assert body["created_at"]
+
+    # Cada linea trae lo necesario para pintar la prenda sin ir al catalogo.
+    line = body["items"][0]
+    assert line["variant_id"] == 1
+    assert line["product_name"]
+    assert line["size_name"]
+    assert line["color_name"]
+    assert line["image_url"]
+    assert line["unit_price"] == 180.0
+    assert line["available"] >= 0
+
+
+def test_client_cancel_accepts_lowercase_status(client, client_headers):
+    """El movil antes enviaba 'cancelled'; la API debe tolerarlo."""
+    reservation = _create_reservation(client, client_headers)
+    r = client.patch(
+        f"/api/v1/reservations/{reservation['id']}/status",
+        json={"status": "cancelled"},
+        headers=client_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "CANCELLED"
+
+
+def test_client_cannot_set_non_cancel_status(client, client_headers):
+    """Un cliente no puede llevar su reserva a PREPARED: eso es de staff."""
+    reservation = _create_reservation(client, client_headers)
+    r = client.patch(
+        f"/api/v1/reservations/{reservation['id']}/status",
+        json={"status": "PREPARED"},
+        headers=client_headers,
+    )
+    assert r.status_code == 403, r.text
+    # La reserva no debe haberse movido.
+    r = client.get(f"/api/v1/reservations/{reservation['id']}", headers=client_headers)
+    assert r.json()["status"] == "PENDING"
+
+
+def test_reservation_requires_branch_id(client, client_headers):
+    """branch_id es obligatorio: sin el, la reserva no tiene donde recogerse."""
+    r = client.post(
+        "/api/v1/reservations",
+        json={"items": [{"variant_id": 1, "quantity": 1}]},
+        headers=client_headers,
+    )
+    assert r.status_code == 422
+

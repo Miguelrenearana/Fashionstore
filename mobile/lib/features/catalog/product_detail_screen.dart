@@ -315,7 +315,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
     if (!mounted || branches.isEmpty) return;
 
-    int? selectedBranchId = branches.first['id'] as int;
+    int selectedBranchId = branches.first['id'] as int;
     int reserveQuantity = 1;
 
     await showModalBottomSheet<void>(
@@ -375,7 +375,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                 child: Text(b['name'] as String),
                               ))
                           .toList(),
-                      onChanged: (v) => setSheetState(() => selectedBranchId = v),
+                      onChanged: (v) =>
+                          setSheetState(() => selectedBranchId = v ?? selectedBranchId),
                     ),
                   ),
                 ),
@@ -391,6 +392,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     label: 'Confirmar reserva',
                     icon: Icons.check_circle_outline,
                     onPressed: () async {
+                      // Capture everything context-dependent before the async
+                      // gap: this BuildContext belongs to build(), not the State.
+                      final router = GoRouter.of(context);
+                      final overlay = Overlay.of(context);
                       Navigator.pop(context);
                       try {
                         await ref
@@ -401,16 +406,14 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                               ],
                               branchId: selectedBranchId,
                             );
-                        if (mounted) {
-                          AppToast.show(context,
-                              message: 'Reserva creada', type: ToastType.success);
-                          context.go('/reservations');
-                        }
+                        if (!mounted) return;
+                        AppToast.showVia(overlay,
+                            message: 'Reserva creada', type: ToastType.success);
+                        router.go('/reservations');
                       } catch (e) {
-                        if (mounted) {
-                          AppToast.show(context,
-                              message: 'Error: ${e.toString()}', type: ToastType.error);
-                        }
+                        if (!mounted) return;
+                        AppToast.showVia(overlay,
+                            message: 'Error: $e', type: ToastType.error);
                       }
                     },
                   ),

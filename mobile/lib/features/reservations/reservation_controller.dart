@@ -16,7 +16,7 @@ class ReservationState {
   final String? error;
 
   List<Reservation> get active =>
-      reservations.where((r) => !r.status.name.contains('cancelled')).toList();
+      reservations.where((r) => !r.status.isFinal).toList();
 
   ReservationState copyWith({
     List<Reservation>? reservations,
@@ -62,19 +62,23 @@ class ReservationController extends StateNotifier<ReservationState> {
 
   Future<void> create({
     required List<Map<String, dynamic>> items,
-    int? branchId,
+    required int branchId,
+    String? notes,
   }) async {
     await _api.post('/reservations', data: {
+      'branch_id': branchId,
       'items': items,
-      if (branchId != null) 'branch_id': branchId,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
     });
     await load();
   }
 
+  /// Cancela la reserva. El backend exige el estado en mayusculas.
   Future<void> cancel(int reservationId) async {
-    await _api.patch('/reservations/$reservationId/status', data: {
-      'status': 'cancelled',
-    });
+    await _api.patch(
+      '/reservations/$reservationId/status',
+      data: {'status': ReservationStatus.cancelled.wireValue},
+    );
     await load();
   }
 

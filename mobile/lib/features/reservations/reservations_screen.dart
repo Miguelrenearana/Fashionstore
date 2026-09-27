@@ -57,18 +57,25 @@ class _ReservationsScreenState extends ConsumerState<ReservationsScreen>
         controller: _tabController,
         children: [
           _buildList(state, null),
-          _buildList(state, ReservationStatus.pending),
-          _buildList(state, ReservationStatus.pickedUp),
-          _buildList(state, ReservationStatus.cancelled),
+          _buildList(state, (r) => !r.status.isFinal),
+          _buildList(state, (r) => r.status == ReservationStatus.completed),
+          _buildList(
+            state,
+            (r) => r.status == ReservationStatus.cancelled ||
+                r.status == ReservationStatus.expired,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildList(ReservationState state, ReservationStatus? status) {
-    final filtered = status == null
+  Widget _buildList(
+    ReservationState state,
+    bool Function(Reservation)? where,
+  ) {
+    final filtered = where == null
         ? state.reservations
-        : state.reservations.where((r) => r.status == status).toList();
+        : state.reservations.where(where).toList();
 
     if (state.isLoading && filtered.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -183,7 +190,7 @@ class _ReservationCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      item.name,
+                      item.name ?? 'Prenda #${item.variantId}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium,
@@ -213,7 +220,7 @@ class _ReservationCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                reservation.branch ?? 'Sucursal principal',
+                reservation.branchName ?? 'Sucursal principal',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: AppColors.textSecondary),
               ),

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
 from app.core.dependencies import CurrentUser, DbSession
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.analytics import Notification
 from app.schemas.notification import NotificationRead
 
@@ -26,6 +26,8 @@ def mark_read(db: DbSession, notification_id: int, current: CurrentUser):
     notification = db.get(Notification, notification_id)
     if not notification:
         raise NotFoundError("Notification not found.")
+    if notification.user_id != current.id:
+        raise ForbiddenError("La notificación no pertenece al usuario autenticado.")
     notification.is_read = True
     db.commit()
     db.refresh(notification)

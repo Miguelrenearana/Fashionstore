@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -358,7 +359,6 @@ class TestCU25PaymentStaticQR:
 
         # Send webhook twice
         payload = {"reference": reference, "status": "COMPLETED", "amount": 150.00}
-        signature = self._sign_payload(payload)
 
         for _ in range(2):
             r = self._make_webhook_request(client, payload)
@@ -396,6 +396,30 @@ class TestCU25PaymentStaticQR:
         # The SVG uses width/height attributes instead of viewBox
         assert 'width="' in r.text
         assert 'height="' in r.text
+
+    def test_qr_png_endpoint_returns_a_png_image(self, client, client_headers):
+        """La app movil no puede pintar SVG: necesita el PNG con la referencia."""
+        sale_id = self._create_sale(Decimal("150.00"))
+
+        db = SessionLocal()
+        try:
+            r = client.post(
+                f"/api/v1/payments/initiate?sale_id={sale_id}&method=static_qr",
+                headers=client_headers,
+            )
+        finally:
+            db.close()
+        reference = r.json()["gateway_reference"]
+
+        r = client.get(f"/api/v1/payments/qr/{reference}.png")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "image/png"
+        assert len(r.content) > 0
+        # Magic bytes reales de PNG, no solo el content-type.
+        assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_qr_png_unknown_reference_404(self, client):
+        assert client.get("/api/v1/payments/qr/NOPE-404.png").status_code == 404
 
     def test_payment_page_html(self, client):
         """Test payment page renders HTML with QR and auto-complete."""
@@ -440,7 +464,7 @@ class TestCU25PaymentStaticQR:
         assert req.method == "static_qr"
 
         # Invalid method
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PaymentInitRequest(sale_id=1, method="invalid_method")
 
     def test_payment_init_response_schema(self):

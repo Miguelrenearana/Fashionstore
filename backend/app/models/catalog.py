@@ -88,13 +88,14 @@ class Garment(Base, TimestampMixin, SoftDeleteMixin):
 
     @property
     def in_stock(self) -> bool:
-        return any(
-            v.inventory is not None and v.inventory.available > 0 for v in self.variations
-        )
+        return any(v.available > 0 for v in self.variations)
 
 
 class GarmentVariant(Base, TimestampMixin):
     __tablename__ = "prenda_variante"
+
+    # _stock_override / _available_override son estado de la respuesta, no columnas.
+    __allow_unmapped__ = True
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     garment_id: Mapped[int] = mapped_column(ForeignKey("prenda.id", ondelete="CASCADE"), nullable=False)
@@ -106,7 +107,39 @@ class GarmentVariant(Base, TimestampMixin):
     garment = relationship("Garment", back_populates="variations")
     size = relationship("Size", back_populates="variations")
     color = relationship("Color", back_populates="variations")
-    inventory = relationship("Inventory", back_populates="variant", uselist=False)
+    # Una fila de inventario por cada sucursal donde existe la variante.
+    inventory = relationship("Inventory", back_populates="variant")
+
+    # Valores de inventario resueltos por el servicio de catálogo para una
+    # sucursal concreta. No son columnas: son estado de la respuesta actual.
+    _stock_override: int | None = None
+    _available_override: int | None = None
+
+    def set_stock(self, stock: int, available: int) -> None:
+        """Fija el inventario resuelto por el servicio (respeta branch_id)."""
+        self._stock_override = stock
+        self._available_override = available
+
+    @property
+    def stock(self) -> int:
+        """Unidades fisicas en inventario (CU-14)."""
+        if self._stock_override is not None:
+            return self._stock_override
+        return sum(r.quantity for r in self.inventory)
+
+    @property
+    def available(self) -> int:
+        """Unidades disponibles tras descontar reservas (CU-14)."""
+        if self._available_override is not None:
+            return self._available_override
+        return self.available_at()
+
+    def available_at(self, branch_id: int | None = None) -> int:
+        """Unidades disponibles de la variante, opcionalmente en una sucursal (CU-14)."""
+        rows = self.inventory
+        if branch_id is not None:
+            rows = [r for r in rows if r.branch_id == branch_id]
+        return sum(r.available for r in rows)
 
     @property
     def size_name(self) -> str | None:

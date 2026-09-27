@@ -11,10 +11,12 @@ import { AuthService } from '@core/auth/auth.service';
       <aside class="sidebar">
         <h2 class="title">Administración</h2>
         <nav class="nav" aria-label="Navegación de administración">
-          <a routerLink="users" routerLinkActive="active" class="nav-link">Usuarios y roles</a>
+          <a routerLink="users" routerLinkActive="active" class="nav-link">Usuarios y roles (CU-04)</a>
+          <a routerLink="locations" routerLinkActive="active" class="nav-link">Ciudades y sucursales (CU-06)</a>
           <a routerLink="catalog" routerLinkActive="active" class="nav-link">Catálogo (tallas, colores…)</a>
           <a routerLink="products" routerLinkActive="active" class="nav-link">Productos</a>
-          <a routerLink="inventory" routerLinkActive="active" class="nav-link">Inventario</a>
+          <a routerLink="inventory" routerLinkActive="active" class="nav-link">Inventario (CU-27 · CU-28)</a>
+          <a routerLink="reception" routerLinkActive="active" class="nav-link">Recepción de productos (CU-29)</a>
           <a routerLink="promotions" routerLinkActive="active" class="nav-link">Promociones (CU-11)</a>
           <a routerLink="reports" routerLinkActive="active" class="nav-link">Reportes</a>
           <a routerLink="reports/ai" routerLinkActive="active" class="nav-link">Reportes IA</a>

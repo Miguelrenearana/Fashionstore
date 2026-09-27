@@ -168,21 +168,6 @@ class InventoryTurnoverResponse(ORMModel):
     avg_turnover_rate: Decimal
 
 
-class TopCategoriesItem(BaseModel):
-    category_id: int
-    category_name: str
-    total_revenue: Decimal
-    total_quantity: int
-    avg_price: Decimal
-    margin_pct: Decimal | None = None
-
-
-class TopCategoriesResponse(ORMModel):
-    generated_at: datetime
-    period: str
-    items: list[TopCategoriesItem]
-
-
 class InventoryValuationItem(BaseModel):
     branch_id: int
     branch_name: str

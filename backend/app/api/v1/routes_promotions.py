@@ -35,9 +35,9 @@ def create_promotion(
         )
         return result
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("", response_model=PromotionPageResponse)
@@ -72,7 +72,7 @@ def get_promotion(promotion_id: int, db: DbSession):
         result = promotion_service.get(db, promotion_id)
         return result
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.patch("/{promotion_id}", response_model=PromotionRead)
@@ -87,11 +87,11 @@ def update_promotion(
         result = promotion_service.update(db, promotion_id, **payload.model_dump(exclude_unset=True))
         return result
     except NotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.delete("/{promotion_id}")
@@ -101,7 +101,7 @@ def delete_promotion(promotion_id: int, db: DbSession, current: CurrentUser = No
         promotion_service.delete(db, promotion_id)
         return {"message": "Promoción eliminada correctamente"}
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.get("/by-garment/{garment_id}", response_model=list[dict])
@@ -117,8 +117,8 @@ def get_promotions_by_garment(garment_id: int, db: DbSession):
     ).join(Promotion.garments).filter(
         Promotion.garments.any(id=garment_id),
         Promotion.status == PromotionStatus.ACTIVE,
-        Promotion.start_at <= datetime.now(UTC),
-        Promotion.end_at >= datetime.now(UTC),
+        Promotion.start_at <= now,
+        Promotion.end_at >= now,
     ).all()
 
     return [

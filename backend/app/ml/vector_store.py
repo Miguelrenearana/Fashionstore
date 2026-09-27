@@ -1,6 +1,6 @@
 from sqlalchemy import text
 
-from app.core.database import engine
+from app.core.database import get_engine
 
 
 class VectorStore:
@@ -21,12 +21,12 @@ class VectorStore:
 
     @classmethod
     def save(cls, variant_id: int, vector: list[float], model: str) -> None:
-        with engine.begin() as conn:
+        with get_engine().begin() as conn:
             conn.execute(cls.UPSERT, {"variant_id": variant_id, "model": model, "vector": vector})
 
     @classmethod
     def index_exists(cls) -> bool:
-        with engine.connect() as conn:
+        with get_engine().connect() as conn:
             rows = conn.execute(cls.INDEX_QUERY).fetchall()
         names = {r[0] for r in rows}
         return "ix_product_embeddings_vector" in names or any(
@@ -40,7 +40,7 @@ class VectorStore:
             "ON product_embeddings USING ivfflat (embedding vector_cosine_ops) "
             "WITH (lists = 100)"
         )
-        with engine.begin() as conn:
+        with get_engine().begin() as conn:
             conn.execute(stmt)
 
     @classmethod
@@ -57,6 +57,6 @@ class VectorStore:
             "ORDER BY embedding <=> CAST(:vec AS vector) "
             "LIMIT :limit"
         )
-        with engine.connect() as conn:
+        with get_engine().connect() as conn:
             rows = conn.execute(query, params).fetchall()
         return [(int(r[0]), float(r[1])) for r in rows]

@@ -56,7 +56,7 @@ class ProductService:
     def delete(self, db: Session, garment_id: int) -> None:
         garment = self.get(db, garment_id)
         for variant in garment.variations:
-            if variant.inventory and variant.inventory.reserved_quantity > 0:
+            if any(row.reserved_quantity > 0 for row in variant.inventory):
                 raise ValidationError("Cannot deactivate garment with reserved stock.")
         garment.is_active = False
         db.commit()

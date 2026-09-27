@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 import json
@@ -9,7 +10,7 @@ from fastapi.responses import HTMLResponse
 
 from app.core.config import settings
 from app.core.dependencies import CurrentUser, DbSession
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.sales import Payment, Sale, SalePaymentStatus, SaleStatus
 from app.payments.adapters.static_qr_gateway import StaticQRGateway
 from app.payments.domain.service import PaymentService
@@ -47,10 +48,28 @@ def initiate_payment(
         method=method,
         status=result.status,
     )
+    _apply_gateway_raw(payment, result.raw)
     db.add(payment)
     db.commit()
     db.refresh(payment)
     return payment
+
+
+def _apply_gateway_raw(payment: Payment, raw: dict) -> None:
+    """Persiste los datos del gateway que la pasarela necesita para verificar el pago."""
+    if not raw:
+        return
+    payload = raw.get("qr_payload")
+    if payload:
+        payment.qr_payload = str(payload)[:500]
+    expires_at = raw.get("expires_at")
+    if expires_at:
+        try:
+            parsed = datetime.fromisoformat(str(expires_at))
+        except ValueError:
+            parsed = None
+        if parsed is not None:
+            payment.qr_expires_at = parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 @router.post("/confirm")
@@ -80,18 +99,34 @@ def confirm_payment(
 @router.post("/refund")
 def refund_payment(
     db: DbSession,
-    gateway_reference: str,
     service: Annotated[PaymentService, Depends(get_payment_service)],
+    current: CurrentUser,
+    gateway_reference: str,
 ):
-    result = service.refund(gateway_reference)
+    """
+    Reembolsa un pago. Solo A2 Administrador, A3 Encargado y A4 Cajero.
+    A3/A4 solo pueden reembolsar ventas de su propia sucursal.
+    """
+    roles = {r.name for r in current.roles}
+    if not roles.intersection({"ADMIN", "MANAGER", "CASHIER"}):
+        raise ForbiddenError("Insufficient permissions.")
+
     payment = db.query(Payment).filter(Payment.gateway_reference == gateway_reference).first()
-    if payment:
-        payment.status = result.status
-        if payment.sale:
-            payment.sale.status = SaleStatus.REFUNDED
-            if result.status == SalePaymentStatus.REFUNDED:
-                receipt_service.generate(db, payment.sale, receipt_type="credit_note")
-        db.commit()
+    if not payment:
+        raise NotFoundError("Pago no encontrado para la referencia indicada.")
+
+    if "ADMIN" not in roles:
+        employee = current.employee
+        if not employee or not payment.sale or payment.sale.branch_id != employee.branch_id:
+            raise ForbiddenError("El pago no pertenece a la sucursal del usuario.")
+
+    result = service.refund(gateway_reference)
+    payment.status = result.status
+    if payment.sale:
+        payment.sale.status = SaleStatus.REFUNDED
+        if result.status == SalePaymentStatus.REFUNDED:
+            receipt_service.generate(db, payment.sale, receipt_type="credit_note")
+    db.commit()
     return {"reference": gateway_reference, "status": result.status}
 
 
@@ -127,6 +162,25 @@ def get_qr_svg(reference: str, db: DbSession):
     svg_content = buffer.getvalue().decode("utf-8")
 
     return Response(content=svg_content, media_type="image/svg+xml")
+
+
+@router.get("/qr/{reference}.png")
+def get_qr_png(reference: str, db: DbSession):
+    """Get QR code as PNG for a payment reference.
+
+    La app movil no puede renderizar SVG sin una dependencia extra, asi que se
+    sirve tambien en PNG (``Image.network``).
+    """
+    payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    from app.payments.qr.generator import generate_qr_png_base64
+
+    return Response(
+        content=base64.b64decode(generate_qr_png_base64(payment.gateway_reference)),
+        media_type="image/png",
+    )
 
 
 @router.get("/qr/{reference}")
@@ -176,7 +230,7 @@ def payment_page(reference: str, db: DbSession):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Pago - {merchant_name}</title>
         <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                      max-width: 400px; margin: 0 auto; padding: 20px; background: #f5f5f5; }}
             .card {{ background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
             h2 {{ color: #333; margin-bottom: 8px; }}
@@ -184,7 +238,7 @@ def payment_page(reference: str, db: DbSession):
             .merchant {{ color: #666; margin-bottom: 24px; }}
             .qr-container {{ text-align: center; margin: 24px 0; }}
             .qr-image {{ max-width: 280px; border-radius: 8px; }}
-            .btn {{ width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 600; 
+            .btn {{ width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 600;
                      background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; }}
             .btn:hover {{ background: #219a52; }}
             .timer {{ text-align: center; margin-top: 16px; color: #e74c3c; font-weight: 600; }}
@@ -194,32 +248,32 @@ def payment_page(reference: str, db: DbSession):
     <body>
         <div class="card">
             <h2>{merchant_name}</h2>
-            <div class="amount">{float(payment.amount):.2f} {payment.currency}</div>
+            <div class="amount">{amount:.2f} {currency}</div>
             <p class="merchant">Referencia: {payment.gateway_reference}</p>
-            
+
             <div class="qr-container">
                 <img src="/api/v1/payments/qr/{payment.gateway_reference}.svg" alt="QR Code" class="qr-image">
             </div>
-            
+
             <button class="btn" id="payBtn" onclick="payNow()">
                 Pagar Ahora
             </button>
-            
+
             <div class="timer" id="timer">
-                Pago automático en <span id="countdown">{getattr(settings, "static_qr_auto_complete_seconds", 30)}</span>s
+                Pago automático en <span id="countdown">{auto_complete}</span>s
             </div>
-            
+
             <div class="footer">
                 <p>Escanea el QR con tu app bancaria o haz clic en "Pagar Ahora"</p>
                 <p>Referencia: {payment.gateway_reference}</p>
             </div>
         </div>
-        
+
         <script>
-            let countdown = {getattr(settings, "static_qr_auto_complete_seconds", 30)};
+            let countdown = {auto_complete};
             const countdownEl = document.getElementById('countdown');
             const payBtn = document.getElementById('payBtn');
-            
+
             const timer = setInterval(() => {{
                 countdown--;
                 document.getElementById('countdown').textContent = countdown;
@@ -228,7 +282,7 @@ def payment_page(reference: str, db: DbSession):
                     autoPay();
                 }}
             }}, 1000);
-            
+
             function payNow() {{
                 fetch('/api/v1/payments/webhook/static_qr', {{
                     method: 'POST',
@@ -238,13 +292,13 @@ def payment_page(reference: str, db: DbSession):
                     body: JSON.stringify({{
                         reference: '{payment.gateway_reference}',
                         status: 'COMPLETED',
-                        amount: {float(payment.amount)}
+                        amount: {amount}
                     }})
                 }}).then(() => {{
                     window.location.href = '/success?ref={payment.gateway_reference}';
                 }});
             }}
-            
+
             function autoPay() {{
                 fetch('/api/v1/payments/webhook/static_qr', {{
                     method: 'POST',
@@ -254,13 +308,13 @@ def payment_page(reference: str, db: DbSession):
                     body: JSON.stringify({{
                         reference: '{payment.gateway_reference}',
                         status: 'COMPLETED',
-                        amount: {float(payment.amount)}
+                        amount: {amount}
                     }})
                 }}).then(() => {{
                     window.location.href = '/success?ref={payment.gateway_reference}';
                 }});
             }}
-            
+
             // Poll for status
             setInterval(async () => {{
                 try {{
@@ -303,8 +357,8 @@ async def webhook_static_qr(request: Request, db: DbSession):
 
     try:
         payload = json.loads(body_str)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
 
     reference = payload.get("reference")
     status = payload.get("status")
@@ -316,6 +370,9 @@ async def webhook_static_qr(request: Request, db: DbSession):
     payment = db.query(Payment).filter(Payment.gateway_reference == reference).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
+
+    if amount is not None and abs(float(amount) - float(payment.amount)) > 0.01:
+        raise HTTPException(status_code=400, detail="Amount does not match the payment")
 
     if payment.status == "COMPLETED":
         return {"success": True, "message": "Already completed"}

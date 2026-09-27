@@ -1,4 +1,5 @@
 from app.core.database import SessionLocal
+from app.models.catalog import GarmentVariant
 from app.models.inventory import ProductEmbedding
 
 
@@ -53,3 +54,37 @@ def test_recommendations_from_browsing_history(client, client_headers):
     r = client.get("/api/v1/recommendations?limit=5", headers=client_headers)
     assert r.status_code == 200, r.text
     assert r.json()
+
+
+def test_recommendations_never_repeat_the_same_garment(client, client_headers):
+    """El embedding no distingue tallas, asi que una recomendacion debe ser
+    SIEMPRE otra prenda: ofrecer otra talla de la que ya se mira no sirve."""
+    _ensure_embeddings()
+    ids = _variant_ids(client, client_headers)
+    source = ids[0]
+
+    r = client.get(
+        f"/api/v1/recommendations?source_variant_id={source}&limit=10",
+        headers=client_headers,
+    )
+    assert r.status_code == 200, r.text
+    recs = r.json()
+    assert recs, "se esperan recomendaciones de otras prendas"
+
+    source_garment = recs_db_garment(source)
+    for rec in recs:
+        assert rec["garment_id"] != source_garment, (
+            f"recomienda la misma prenda ({rec['garment_id']}) en otra variante"
+        )
+        assert rec["score"] < 1.0, "similitud 1.0 = misma prenda, no es una recomendacion"
+
+    # Tampoco debe repetir la misma prenda entre las recomendaciones.
+    assert len({rec["garment_id"] for rec in recs}) == len(recs)
+
+
+def recs_db_garment(variant_id: int) -> int:
+    db = SessionLocal()
+    try:
+        return db.get(GarmentVariant, variant_id).garment_id
+    finally:
+        db.close()

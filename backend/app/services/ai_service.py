@@ -1,3 +1,5 @@
+import time
+
 import httpx
 from sqlalchemy import desc, func, text
 from sqlalchemy.orm import Session
@@ -162,9 +164,9 @@ class AIService:
                 "tokens": data.get("eval_count", 0) + data.get("prompt_eval_count", 0),
             }
         except httpx.HTTPStatusError as e:
-            raise Exception(f"Ollama error: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"Ollama error: {e.response.status_code} - {e.response.text}") from e
         except Exception as e:
-            raise Exception(f"Ollama connection error: {str(e)}")
+            raise Exception(f"Ollama connection error: {str(e)}") from e
 
     def chat_with_context(
         self,
@@ -178,7 +180,7 @@ class AIService:
         messages = []
 
         # System prompt con contexto
-        system_prompt = f"""Eres un asistente de moda para FashionStore. 
+        system_prompt = f"""Eres un asistente de moda para FashionStore.
 Ayuda a los clientes con recomendaciones, información de productos, tallas, colores, disponibilidad y preguntas generales.
 
 {context}
@@ -216,7 +218,7 @@ Sé amable, conciso y útil. Responde en español."""
         # Prompt para el modelo
         tables_info = self._get_tables_schema()
 
-        system_prompt = f"""Eres un generador de SQL para PostgreSQL. 
+        system_prompt = f"""Eres un generador de SQL para PostgreSQL.
 Convierte lenguaje natural a SQL seguro.
 
 REGLAS ESTRICTAS:
@@ -249,29 +251,31 @@ Ejemplos:
                 "explanation": "SQL generado automáticamente desde lenguaje natural"
             }
         except Exception as e:
-            raise ValidationError(f"Error generando SQL: {str(e)}")
+            raise ValidationError(f"Error generando SQL: {str(e)}") from e
 
     def execute_ai_report(self, prompt: str, max_rows: int = 100) -> dict:
         """Ejecutar reporte generado por IA y devolver resultados."""
         result = self.generate_sql_query(prompt, max_rows)
         sql = result["sql"]
 
+        start = time.perf_counter()
         try:
-            from app.core.database import engine
-            with engine.connect() as conn:
+            from app.core.database import get_engine
+            with get_engine().connect() as conn:
                 result = conn.execute(text(sql))
-                columns = result.keys()
+                # CU-32: columnas tipadas (name, type) + filas como listas
+                columns = [{"name": name, "type": str(getattr(result, "type", None) or "")} for name in result.keys()]
                 rows = [list(row) for row in result.fetchall()]
 
                 return {
-                    "columns": list(columns),
+                    "columns": columns,
                     "rows": rows,
                     "row_count": len(rows),
                     "generated_sql": sql,
-                    "execution_time_ms": 0,  # Se podría medir
+                    "execution_time_ms": round((time.perf_counter() - start) * 1000, 2),
                 }
         except Exception as e:
-            raise ValidationError(f"Error ejecutando reporte: {str(e)}")
+            raise ValidationError(f"Error ejecutando reporte: {str(e)}") from e
 
     # Métodos auxiliares privados
 
@@ -345,10 +349,7 @@ Ejemplos:
             data = response.json()
             return data.get("response", "")
         except Exception as e:
-            raise Exception(f"Ollama generate error: {str(e)}")
-
-    def _get_tables_schema(self) -> str:
-        return self._get_tables_schema()
+            raise Exception(f"Ollama generate error: {str(e)}") from e
 
 
 ai_service = AIService()

@@ -244,8 +244,14 @@ def _make_paid_sale(
     return sale
 
 
-def run() -> None:
-    db = SessionLocal()
+def run(session: Session | None = None, *, quiet: bool = False) -> None:
+    """Siembra datos demo.
+
+    Si se pasa ``session`` se reutiliza (usado por la suite de pruebas para
+    sembrar una base aislada) y no se cierra al terminar.
+    """
+    db = session or SessionLocal()
+    owns_session = session is None
 
     roles = ["ADMIN", "MANAGER", "CASHIER", "CLIENT", "SUPPLIER"]
     for name in roles:
@@ -734,14 +740,30 @@ def run() -> None:
         ])
         db.commit()
 
-    print("Seeding completed.")
-    print("Usuarios demo:")
-    for email, password in DEMO_PASSWORDS.items():
-        print(f"  {email}  /  {password}")
-    print("Cliente demo con email real (recibe correo de recuperación):")
-    print(f"  {REAL_CLIENT_EMAIL}  /  Client123!")
-    db.close()
-    engine.dispose()
+    # ---- Embeddings de recomendaciones (CU-27) ----
+    # VectorStore escribe sobre el engine crudo, fuera de la transaccion del test,
+    # asi que solo se calcula cuando el seed es dueno de su sesion (uso real).
+    embeddings = 0
+    if owns_session:
+        try:
+            from app.tasks.recommendation_batch import recompute_embeddings
+
+            embeddings = recompute_embeddings()
+        except Exception as exc:  # pragma: no cover - el seed no debe fallar por ML
+            print(f"  aviso: no se pudieron generar embeddings ({exc})")
+
+    if not quiet:
+        print("Seeding completed.")
+        if embeddings:
+            print(f"Embeddings de recomendaciones generados: {embeddings}")
+        print("Usuarios demo:")
+        for email, password in DEMO_PASSWORDS.items():
+            print(f"  {email}  /  {password}")
+        print("Cliente demo con email real (recibe correo de recuperación):")
+        print(f"  {REAL_CLIENT_EMAIL}  /  Client123!")
+    if owns_session:
+        db.close()
+        engine.dispose()
 
 
 if __name__ == "__main__":

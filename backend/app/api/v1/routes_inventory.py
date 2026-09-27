@@ -7,10 +7,13 @@ from app.services.inventory_service import inventory_service
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 admin_manager = require_roles("ADMIN", "MANAGER")
-branch_manager = require_roles("ADMIN", "MANAGER", "BRANCH_MANAGER")
+branch_manager = require_roles("ADMIN", "MANAGER")
+# A4 (CASHIER) necesita leer existencias para operar el punto de venta (CU-23),
+# pero no puede registrar movimientos (CU-28) ni ajustes.
+stock_reader = require_roles("ADMIN", "MANAGER", "CASHIER")
 
 
-@router.get("", response_model=list[InventoryRead], dependencies=[Depends(branch_manager)])
+@router.get("", response_model=list[InventoryRead], dependencies=[Depends(stock_reader)])
 def list_inventory(
     db: DbSession,
     branch_id: int,

@@ -19,7 +19,8 @@ export interface RegisterPayload {
   birth_date?: string;
 }
 
-const STAFF_ROLES = ['ADMIN', 'MANAGER', 'CASHIER', 'BRANCH_MANAGER'];
+/** Roles de personal con acceso a la consola web (A2, A3, A4). */
+const STAFF_ROLES = ['ADMIN', 'MANAGER', 'CASHIER'];
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -95,10 +96,12 @@ export class AuthService {
     return this.hasAnyRole(...STAFF_ROLES);
   }
 
-  /** Ruta de inicio según rol tras iniciar sesión. */
+  /** Ruta de inicio según rol tras iniciar sesión (A1..A4). */
   homeRoute(): string {
-    if (this.hasAnyRole('ADMIN', 'MANAGER')) return '/admin';
-    if (this.hasAnyRole('BRANCH_MANAGER', 'CASHIER')) return '/staff';
+    if (this.hasAnyRole('ADMIN')) return '/admin';
+    if (this.hasAnyRole('MANAGER')) return '/staff';
+    if (this.hasAnyRole('CASHIER')) return '/pos';
+    if (this.hasAnyRole('CLIENT')) return '/client/catalog';
     return '/';
   }
 }

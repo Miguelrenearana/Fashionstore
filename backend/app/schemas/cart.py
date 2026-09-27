@@ -1,4 +1,6 @@
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common import ORMModel
@@ -50,8 +52,9 @@ class CartCheckout(BaseModel):
 class CartPurchase(BaseModel):
     branch_id: int | None = None
     payment_method: str = "card"
+    checkout_token: UUID | None = None
 
 
 class PurchaseResponse(BaseModel):
     sale: SaleRead
-    payment: PaymentRead
+    payment: PaymentRead | None

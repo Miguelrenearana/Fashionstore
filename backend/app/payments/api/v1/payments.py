@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.dependencies import CurrentUser, DbSession
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.sales import Payment, Sale, SalePaymentStatus, SaleStatus
+from app.models.user import Client
 from app.payments.adapters.static_qr_gateway import StaticQRGateway
 from app.payments.domain.service import PaymentService
 from app.payments.factory import get_payment_service
@@ -77,23 +78,39 @@ def confirm_payment(
     db: DbSession,
     payload: PaymentConfirm,
     service: Annotated[PaymentService, Depends(get_payment_service)],
+    current: CurrentUser,
 ):
     ref = payload.gateway_reference or payload.token
     if not ref:
         raise NotFoundError("Missing payment reference.")
-    status_result = service.status(ref)
-    payment = db.query(Payment).filter(Payment.gateway_reference == ref).first()
-    if payment:
-        payment.status = status_result.status
-        if payment.sale:
-            if status_result.status == SalePaymentStatus.COMPLETED:
-                payment.sale.status = SaleStatus.PAID
-                payment.sale.paid_at = datetime.now(UTC)
-                receipt_service.generate(db, payment.sale)
-            elif status_result.status == SalePaymentStatus.DECLINED:
-                payment.sale.status = SaleStatus.CANCELLED
-        db.commit()
-    return {"reference": ref, "status": status_result.status}
+    payment = db.query(Payment).filter(Payment.gateway_reference == ref).with_for_update().first()
+    if not payment or not payment.sale:
+        raise NotFoundError("Payment or sale not found.")
+    sale = payment.sale
+    roles = {role.name for role in current.roles}
+    owner = db.query(Client).filter(Client.user_id == current.id).first()
+    is_owner = owner is not None and owner.id == sale.client_id
+    is_staff = "ADMIN" in roles or (
+        bool(roles.intersection({"MANAGER", "CASHIER"}))
+        and current.employee is not None
+        and current.employee.is_active
+        and current.employee.branch_id == sale.branch_id
+    )
+    if not (is_owner or is_staff):
+        raise ForbiddenError("You cannot confirm this payment.")
+    # Retries must not charge again, regress a terminal state or reissue a receipt.
+    if payment.status not in (SalePaymentStatus.PENDING, SalePaymentStatus.COMPLETED):
+        return {"reference": ref, "status": payment.status}
+    if payment.status == SalePaymentStatus.PENDING:
+        payment.status = service.status(ref).status
+    if payment.status == SalePaymentStatus.COMPLETED:
+        sale.status = SaleStatus.PAID
+        sale.paid_at = sale.paid_at or datetime.now(UTC)
+        receipt_service.generate(db, sale)
+    elif payment.status == SalePaymentStatus.DECLINED:
+        sale.status = SaleStatus.CANCELLED
+    db.commit()
+    return {"reference": ref, "status": payment.status}
 
 
 @router.post("/refund")

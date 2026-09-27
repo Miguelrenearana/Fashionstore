@@ -2,7 +2,14 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ClientService, CartItem } from './client.service';
+import { forkJoin } from 'rxjs';
+import { ClientService, CartItem, PurchaseResponse } from './client.service';
+
+interface CheckoutPayment {
+  saleId: number;
+  reference: string;
+  status: string;
+}
 
 @Component({
   selector: 'app-client-checkout',
@@ -26,6 +33,34 @@ import { ClientService, CartItem } from './client.service';
             <a routerLink="/client/catalog" class="btn btn-outline">Seguir comprando</a>
           </div>
         </div>
+      } @else if (payment) {
+        <section class="card section" aria-live="polite">
+          <h2>Estado del pago: {{ payment.status }}</h2>
+          @if (payment.saleId) { <p>Venta #{{ payment.saleId }}</p> }
+          @if (payment.reference) {
+            <p>Referencia: <strong>{{ payment.reference }}</strong></p>
+            <button type="button" class="btn btn-primary" [disabled]="processing || !ready || gateway !== 'mock'" (click)="confirmPayment()">
+              {{ processing ? 'Consultando pago...' : 'Consultar / reintentar confirmación' }}
+            </button>
+          } @else {
+            <p>No se recibió una referencia de pago. Revisa el historial antes de intentar otra compra.</p>
+          }
+          <p>Esta consulta conserva la venta existente.</p>
+          @if (payment.status === 'DECLINED' || payment.status === 'TIMEOUT') {
+            <button class="btn btn-outline" [disabled]="processing" (click)="startNewPurchase()">Empezar otra compra</button>
+          }
+          <a routerLink="/client/history" class="btn btn-outline">Ver historial de compras</a>
+        </section>
+      } @else if (attempt) {
+        <section class="card section" aria-live="polite">
+          <h2>{{ processing ? 'Consultando compra...' : 'Resultado de compra por verificar' }}</h2>
+          <p>No sabemos todavía si se creó la venta. Consulta este intento antes de iniciar otra compra.</p>
+          <button class="btn btn-primary" [disabled]="processing" (click)="recoverPurchase()">Recuperar / consultar venta</button>
+          @if (retryAttempt) {
+            <button class="btn btn-outline" [disabled]="processing" (click)="submitPurchase()">Reintentar el mismo intento</button>
+          }
+          <a routerLink="/client/history" class="btn btn-outline">Ver historial</a>
+        </section>
       } @else {
         <div class="layout" *ngIf="items.length > 0; else emptyTpl">
           <div class="left">
@@ -95,7 +130,7 @@ import { ClientService, CartItem } from './client.service';
               </div>
             }
             <div class="row total"><span>Total</span><span>S/{{ total | number:'1.2-2' }}</span></div>
-            <button type="button" class="btn btn-primary w-full" [disabled]="processing" (click)="placeOrder()">
+            <button type="button" class="btn btn-primary w-full" [disabled]="processing || !ready || gateway !== 'mock'" (click)="placeOrder()">
               {{ processing ? 'Procesando pago...' : 'Pagar S/' + (total | number:'1.2-2') }}
             </button>
             <p class="secure">🔒 Este pago es simulado en entorno de prueba.</p>
@@ -148,6 +183,12 @@ export class CheckoutComponent implements OnInit {
   error = '';
   success = false;
   processing = false;
+  ready = false;
+  gateway = '';
+  payment: CheckoutPayment | null = null;
+  attempt: { token: string; method: string } | null = null;
+  retryAttempt = false;
+  private storageKey = '';
 
   name = '';
   phone = '';
@@ -161,8 +202,34 @@ export class CheckoutComponent implements OnInit {
   cardCvc = '';
 
   ngOnInit(): void {
+    forkJoin({ config: this.api.getPaymentConfig(), user: this.api.getMe() }).subscribe({
+      next: ({ config, user }) => {
+        this.gateway = config.gateway;
+        this.storageKey = `fs-checkout-payment:${user.id}`;
+        try {
+          const saved = sessionStorage.getItem(this.storageKey);
+          if (saved) {
+            const state = JSON.parse(saved);
+            this.payment = state.payment ?? (state.reference && state.saleId ? state : null);
+            this.attempt = state.attempt ?? null;
+          }
+        } catch {
+          this.error = 'No se pudo recuperar el pago anterior. Revisa el historial antes de continuar.';
+          return;
+        }
+        this.ready = true;
+        if (this.gateway !== 'mock') {
+          this.error = 'Este checkout solo permite confirmar pagos con la pasarela mock.';
+        }
+      },
+      error: () => (this.error = 'No se pudo verificar la pasarela de pago. Recarga la página para reintentar.'),
+    });
+    this.loadCart();
+  }
+
+  private loadCart(): void {
     this.api.getCart().subscribe({
-      next: (res: any) => {
+      next: (res) => {
         this.items = res.items ?? [];
         this.total = Math.max(0, (res.total ?? 0) || this.items.reduce((s, i) => s + i.price * i.quantity, 0));
       },
@@ -171,25 +238,119 @@ export class CheckoutComponent implements OnInit {
   }
 
   placeOrder(): void {
+    if (this.processing || this.success || !this.ready || this.gateway !== 'mock') return;
+    if (this.payment) { this.confirmPayment(); return; }
+    if (this.attempt) { this.recoverPurchase(); return; }
+    if (!this.items.length) return;
     if (!this.name.trim()) { this.error = 'Ingresa el nombre del destinatario.'; return; }
     if (!this.pickup && !this.address.trim()) { this.error = 'Ingresa la dirección de entrega.'; return; }
 
+    this.attempt = { token: crypto.randomUUID(), method: this.paymentMethod };
+    if (!this.savePayment()) { this.attempt = null; return; }
+    this.submitPurchase();
+  }
+
+  submitPurchase(): void {
+    if (!this.attempt || this.payment || this.processing || !this.ready || this.gateway !== 'mock') return;
     this.processing = true;
+    this.retryAttempt = false;
     this.error = '';
     this.api
       .checkout(
         this.pickup ? null : { name: this.name, phone: this.phone, address: this.address, city: this.city },
-        this.paymentMethod
+        this.attempt.method,
+        this.attempt.token,
       )
       .subscribe({
-        next: () => {
-          this.success = true;
+        next: (res) => this.acceptPurchase(res),
+        error: (err) => {
           this.processing = false;
-        },
-        error: () => {
-          this.error = 'No se pudo completar el pago. Revisa los datos e intenta nuevamente.';
-          this.processing = false;
+          if ([400, 401, 403, 409, 422].includes(err.status)) {
+            this.attempt = null;
+            this.savePayment();
+            this.error = 'La compra no fue creada. Corrige los datos o revisa el stock e intenta nuevamente.';
+          } else {
+            this.error = 'No se pudo verificar la creación de la venta. Recupera este intento antes de continuar.';
+          }
         },
       });
+  }
+
+  recoverPurchase(): void {
+    if (!this.attempt || this.processing || !this.ready) return;
+    this.processing = true;
+    this.error = '';
+    this.retryAttempt = false;
+    this.api.recoverPurchase(this.attempt.token).subscribe({
+      next: (res) => this.acceptPurchase(res),
+      error: (err) => {
+        this.processing = false;
+        this.retryAttempt = err.status === 404;
+        this.error = err.status === 404
+          ? 'Todavía no se encontró la venta. Puedes reintentar el mismo intento sin duplicarla.'
+          : 'No se pudo recuperar la compra. Conservamos el intento para volver a consultar.';
+      },
+    });
+  }
+
+  private acceptPurchase(res: PurchaseResponse): void {
+    this.processing = false;
+    if (!res.sale?.id || !res.payment?.gateway_reference) {
+      this.error = 'La venta aún no tiene una referencia de pago disponible. Vuelve a consultar; si persiste, solicita asistencia con este intento: ' + this.attempt?.token;
+      return;
+    }
+    this.payment = { saleId: res.sale.id, reference: res.payment.gateway_reference, status: res.payment.status };
+    this.savePayment();
+    this.items = [];
+    this.confirmPayment();
+  }
+
+  startNewPurchase(): void {
+    if (!this.payment || this.processing || !['DECLINED', 'TIMEOUT'].includes(this.payment.status)) return;
+    this.confirmPayment(true);
+  }
+
+  confirmPayment(startNew = false): void {
+    const reference = this.payment?.reference;
+    if (!reference || this.processing || !this.ready || this.gateway !== 'mock') return;
+    this.processing = true;
+    this.error = '';
+    this.api.confirmPayment(reference).subscribe({
+      next: (res) => {
+        if (res.reference !== reference) {
+          this.error = 'La respuesta no corresponde al pago solicitado. Conservamos la referencia para reintentar.';
+          this.processing = false;
+          return;
+        }
+        this.payment = { ...this.payment!, status: res.status };
+        this.success = res.status === 'COMPLETED';
+        this.processing = false;
+        this.savePayment();
+        if (startNew && ['DECLINED', 'TIMEOUT'].includes(res.status)) {
+          this.payment = null;
+          this.attempt = null;
+          this.savePayment();
+          this.loadCart();
+        }
+        if (this.success) {
+          try { sessionStorage.removeItem(this.storageKey); } catch { /* The reference remains recoverable. */ }
+        }
+      },
+      error: () => {
+        this.processing = false;
+        this.error = 'No se pudo consultar o confirmar el pago. Se muestra el último estado conocido; reintenta con la misma referencia.';
+      },
+    });
+  }
+
+  private savePayment(): boolean {
+    try {
+      if (!this.payment && !this.attempt) sessionStorage.removeItem(this.storageKey);
+      else sessionStorage.setItem(this.storageKey, JSON.stringify({ payment: this.payment, attempt: this.attempt }));
+      return true;
+    } catch {
+      this.error = 'No se pudo guardar la referencia en esta pestaña. Mantén esta página abierta para consultar el pago.';
+      return false;
+    }
   }
 }

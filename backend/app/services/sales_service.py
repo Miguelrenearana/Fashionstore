@@ -17,6 +17,7 @@ class SalesService:
         payload: SaleGenerate,
         employee_id: int | None = None,
         client_id: int | None = None,
+        invoice_number: str | None = None,
     ) -> Sale:
         reservation = None
         if payload.reservation_id:
@@ -30,7 +31,7 @@ class SalesService:
                 {"variant_id": it.variant_id, "quantity": it.quantity} for it in payload.items
             ]
 
-        invoice_number = f"FAC-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+        invoice_number = invoice_number or f"FAC-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
         sale = Sale(
             invoice_number=invoice_number,
             branch_id=reservation.branch_id if reservation else payload.branch_id,

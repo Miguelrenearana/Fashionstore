@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '@core/environments/environment';
 
 export interface Branch {
@@ -58,7 +58,7 @@ export interface CatalogResponse {
 
 export interface CartItem {
   variant_id: number;
-  product_id: number;
+  product_id?: number;
   name: string;
   price: number;
   quantity: number;
@@ -66,6 +66,31 @@ export interface CartItem {
   color?: string;
   image_url?: string;
   subtotal?: number;
+}
+
+export interface PurchaseResponse {
+  sale: { id: number; invoice_number: string; status: string; total_amount: number | string };
+  payment: { id: number; sale_id: number | null; gateway_reference: string | null; status: string } | null;
+}
+
+export interface PaymentConfirmation {
+  reference: string;
+  status: string;
+}
+
+interface CartResponse {
+  details: {
+    variant_id: number;
+    quantity: number;
+    unit_price: number;
+    garment_id?: number | null;
+    garment_name?: string | null;
+    size_name?: string | null;
+    color_name?: string | null;
+    image_url?: string | null;
+  }[];
+  total: number;
+  discount?: number;
 }
 
 export interface NotificationItem {
@@ -80,24 +105,45 @@ export interface NotificationItem {
 
 export interface HistoryEntry {
   id: number;
-  created_at: string;
-  total: number;
+  reference: string;
+  date: string;
+  total_amount: number | string;
   status: string;
   type: 'sale' | 'reservation';
-  items_count?: number;
-  payment_method?: string;
-  items?: HistoryItem[];
-  reservation_code?: string;
-  branch_name?: string;
+  items_count: number;
+  branch_name?: string | null;
 }
 
-export interface HistoryItem {
-  product_name: string;
+export interface HistoryResponse {
+  items: HistoryEntry[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+export interface ReceiptItem {
+  variant_id: number;
+  garment_name?: string | null;
+  size_name?: string | null;
+  color_name?: string | null;
   quantity: number;
-  price: number;
-  size?: string;
-  color?: string;
-  image_url?: string;
+  unit_price: number;
+  line_total: number;
+}
+
+export interface Receipt {
+  id: number;
+  sale_id: number;
+  type: string;
+  rnc_or_cuf?: string | null;
+  document_url?: string | null;
+  created_at: string;
+  invoice_number?: string | null;
+  total_amount: number;
+  status: string;
+  branch_name?: string | null;
+  items: ReceiptItem[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -150,7 +196,22 @@ export class ClientService {
 
   // CU-20 - Carrito
   getCart(): Observable<{ items: CartItem[]; subtotal?: number; discount?: number; total?: number }> {
-    return this.http.get<{ items: CartItem[] }>(`${environment.apiUrl}/cart`);
+    return this.http.get<CartResponse>(`${environment.apiUrl}/cart`).pipe(
+      map((res) => ({
+        total: res.total,
+        discount: res.discount,
+        items: (res.details ?? []).map((detail): CartItem => ({
+          variant_id: detail.variant_id,
+          product_id: detail.garment_id ?? undefined,
+          name: detail.garment_name ?? `Variante ${detail.variant_id}`,
+          price: detail.unit_price,
+          quantity: detail.quantity,
+          size: detail.size_name ?? undefined,
+          color: detail.color_name ?? undefined,
+          image_url: detail.image_url ?? undefined,
+        })),
+      })),
+    );
   }
 
   addCartItem(variantId: number, quantity: number): Observable<any> {
@@ -158,7 +219,7 @@ export class ClientService {
   }
 
   updateCartItem(variantId: number, quantity: number): Observable<any> {
-    return this.http.patch(`${environment.apiUrl}/cart/items/${variantId}`, { quantity });
+    return this.http.patch(`${environment.apiUrl}/cart/items/${variantId}`, { variant_id: variantId, quantity });
   }
 
   removeCartItem(variantId: number): Observable<any> {
@@ -174,10 +235,25 @@ export class ClientService {
   }
 
   // CU-21/25 - Compra y pago
-  checkout(shipping_address: any, payment_method: string): Observable<any> {
-    return this.http.post(`${environment.apiUrl}/cart/purchase`, {
+  getPaymentConfig(): Observable<{ gateway: string }> {
+    return this.http.get<{ gateway: string }>(`${environment.apiUrl}/payments/config`);
+  }
+
+  confirmPayment(reference: string): Observable<PaymentConfirmation> {
+    return this.http.post<PaymentConfirmation>(`${environment.apiUrl}/payments/confirm`, {
+      gateway_reference: reference,
+    });
+  }
+
+  recoverPurchase(token: string): Observable<PurchaseResponse> {
+    return this.http.get<PurchaseResponse>(`${environment.apiUrl}/cart/purchase/${token}`);
+  }
+
+  checkout(shipping_address: any, payment_method: string, checkout_token?: string): Observable<PurchaseResponse> {
+    return this.http.post<PurchaseResponse>(`${environment.apiUrl}/cart/purchase`, {
       shipping_address,
       payment_method,
+      checkout_token,
     });
   }
 
@@ -202,9 +278,9 @@ export class ClientService {
   }
 
   // CU-22/26 - Historial y comprobantes
-  getHistory(page = 1, size = 20): Observable<any> {
+  getHistory(page = 1, size = 20): Observable<HistoryResponse> {
     const params = new HttpParams().set('page', String(page)).set('size', String(size));
-    return this.http.get(`${environment.apiUrl}/history`, { params });
+    return this.http.get<HistoryResponse>(`${environment.apiUrl}/history`, { params });
   }
 
   getReceipts(page = 1, size = 20): Observable<any> {
@@ -214,6 +290,10 @@ export class ClientService {
 
   getReceipt(id: number): Observable<any> {
     return this.http.get(`${environment.apiUrl}/receipts/${id}`);
+  }
+
+  getSaleReceipt(saleId: number): Observable<Receipt> {
+    return this.http.get<Receipt>(`${environment.apiUrl}/sales/${saleId}/receipt`);
   }
 
   getSale(id: number): Observable<any> {

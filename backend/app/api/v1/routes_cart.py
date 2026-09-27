@@ -1,8 +1,11 @@
+from base64 import urlsafe_b64encode
+from uuid import UUID
+
 from fastapi import APIRouter
 
 from app.core.dependencies import CurrentUser, DbSession
 from app.core.exceptions import NotFoundError, ValidationError
-from app.models.sales import Payment
+from app.models.sales import Payment, Sale
 from app.models.user import Client
 from app.payments.factory import get_payment_service
 from app.schemas.cart import CartCheckout, CartItemIn, CartPurchase, CartRead, PurchaseResponse
@@ -77,10 +80,39 @@ def checkout(db: DbSession, payload: CartCheckout, current: CurrentUser):
     return reservation
 
 
+def _checkout_invoice(token: UUID) -> str:
+    return "WEB-" + urlsafe_b64encode(token.bytes).decode().rstrip("=")
+
+
+def _purchase_response(db, sale):
+    payment = db.query(Payment).filter(Payment.sale_id == sale.id).order_by(Payment.id.desc()).first()
+    return PurchaseResponse(sale=SaleRead.model_validate(sale),
+                            payment=PaymentRead.model_validate(payment) if payment else None)
+
+
+@router.get("/purchase/{checkout_token}", response_model=PurchaseResponse)
+def recover_purchase(checkout_token: UUID, db: DbSession, current: CurrentUser):
+    client_id = _client_id(db, current)
+    sale = db.query(Sale).filter(Sale.invoice_number == _checkout_invoice(checkout_token),
+                                Sale.client_id == client_id).first()
+    if not sale:
+        raise NotFoundError("Purchase not found. Retry using the same checkout token.")
+    return _purchase_response(db, sale)
+
+
 @router.post("/purchase", response_model=PurchaseResponse)
 def purchase(db: DbSession, payload: CartPurchase, current: CurrentUser):
     """CU-21: buy directly from the cart (web/mobile digital purchase)."""
     client_id = _client_id(db, current)
+    # Serialize attempts for this owner. The unique invoice also prevents duplicates.
+    db.query(Client).filter(Client.id == client_id).with_for_update().one()
+    invoice = _checkout_invoice(payload.checkout_token) if payload.checkout_token else None
+    if invoice:
+        existing = db.query(Sale).filter(Sale.invoice_number == invoice).first()
+        if existing:
+            if existing.client_id != client_id:
+                raise NotFoundError("Purchase not found.")
+            return _purchase_response(db, existing)
     cart = cart_service.get_or_create(db, client_id, payload.branch_id or None)
     if not cart.details:
         raise ValidationError("Cart is empty, cannot purchase.")
@@ -94,6 +126,7 @@ def purchase(db: DbSession, payload: CartPurchase, current: CurrentUser):
         db,
         SaleGenerate(branch_id=branch_id, items=items, payment_method=payload.payment_method),
         client_id=client_id,
+        invoice_number=invoice,
     )
     service = get_payment_service()
     result = service.pay(

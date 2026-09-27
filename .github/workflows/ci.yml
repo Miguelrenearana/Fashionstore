@@ -46,6 +46,13 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://fashion:change-me@localhost:5432/fashionstore
         run: pytest -q
+      - name: Isolated checkout regression tests (SQLite, no seed)
+        env:
+          DATABASE_URL: sqlite://
+          TEST_DATABASE_URL: sqlite://
+          PAYMENT_GATEWAY: mock
+          DEBUG: "false"
+        run: python -m pytest isolated_tests --confcutdir=isolated_tests -q
 
   frontend:
     name: Frontend (ng build)
@@ -64,6 +71,8 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build -- --configuration production
+      - name: Checkout and cart tests
+        run: npm test -- --watch=false --browsers=ChromeHeadless
 
   mobile:
     name: Mobile (analyze + test)

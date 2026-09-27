@@ -48,9 +48,9 @@ import { ClientService, CartItem } from './client.service';
                   <p class="unit-price">S/{{ item.price | number:'1.2-2' }} c/u</p>
                 </div>
                 <div class="qty-control">
-                  <button type="button" class="qty-btn" (click)="changeQty(item, item.quantity - 1)" [disabled]="item.quantity <= 1">−</button>
+                  <button type="button" class="qty-btn" (click)="changeQty(item, item.quantity - 1)" [disabled]="item.quantity <= 1 || updating.has(item.variant_id)">−</button>
                   <span class="qty-value">{{ item.quantity }}</span>
-                  <button type="button" class="qty-btn" (click)="changeQty(item, item.quantity + 1)">+</button>
+                  <button type="button" class="qty-btn" (click)="changeQty(item, item.quantity + 1)" [disabled]="updating.has(item.variant_id)">+</button>
                 </div>
                 <p class="line-total">S/{{ (item.price * item.quantity) | number:'1.2-2' }}</p>
                 <button type="button" class="btn btn-ghost btn-sm" (click)="remove(item)">Eliminar</button>
@@ -113,6 +113,7 @@ export class CartComponent implements OnInit {
   private api = inject(ClientService);
 
   items: CartItem[] = [];
+  updating = new Set<number>();
   loading = false;
   error = '';
   couponMsg = '';
@@ -132,7 +133,7 @@ export class CartComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.api.getCart().subscribe({
-      next: (res: any) => {
+      next: (res) => {
         this.items = res.items ?? [];
         this.discount = res.discount ?? 0;
         this.subtotal = this.items.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -145,11 +146,21 @@ export class CartComponent implements OnInit {
   }
 
   changeQty(item: CartItem, qty: number): void {
-    if (qty < 1) return;
-    item.quantity = qty;
+    if (qty < 1 || this.updating.has(item.variant_id)) return;
+    const previous = item.quantity;
+    this.updating.add(item.variant_id);
+    this.error = '';
     this.api.updateCartItem(item.variant_id, qty).subscribe({
-      next: () => this.recalc(),
-      error: () => (this.error = 'No se pudo actualizar la cantidad.'),
+      next: () => {
+        item.quantity = qty;
+        this.updating.delete(item.variant_id);
+        this.recalc();
+      },
+      error: () => {
+        item.quantity = previous;
+        this.updating.delete(item.variant_id);
+        this.error = 'No se pudo actualizar la cantidad.';
+      },
     });
   }
 

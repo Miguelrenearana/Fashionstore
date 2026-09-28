@@ -65,8 +65,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       });
       if (attempts.attempt != null) await _recoverPurchase();
     } catch (_) {
-      if (mounted) setState(() => _error =
-          'No se pudo recuperar el intento anterior. Vuelve a consultar antes de comprar.');
+      if (mounted) {
+        setState(() => _error =
+            'No se pudo recuperar el intento anterior. Vuelve a consultar antes de comprar.');
+      }
     }
   }
 
@@ -103,10 +105,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() {
-        _error = 'No se pudo guardar o verificar el intento. No se enviará otra compra.';
-        _processing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'No se pudo guardar o verificar el intento. No se enviará otra compra.';
+          _processing = false;
+        });
+      }
     }
   }
 
@@ -124,27 +128,33 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       await _acceptPurchase(await request());
     } on ApiException catch (e) {
-      if (mounted) setState(() {
-        _processing = false;
-        _error = e.statusCode == 404
-            ? 'Aún no se encontró la venta. Puedes reintentar el mismo intento sin duplicarla.'
-            : 'No se pudo recuperar la compra. Conservamos el intento para consultar de nuevo.';
-      });
+      if (mounted) {
+        setState(() {
+          _processing = false;
+          _error = e.statusCode == 404
+              ? 'Aún no se encontró la venta. Puedes reintentar el mismo intento sin duplicarla.'
+              : 'No se pudo recuperar la compra. Conservamos el intento para consultar de nuevo.';
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() {
-        _processing = false;
-        _error = 'No se pudo verificar la compra. Conservamos el intento para consultar de nuevo.';
-      });
+      if (mounted) {
+        setState(() {
+          _processing = false;
+          _error = 'No se pudo verificar la compra. Conservamos el intento para consultar de nuevo.';
+        });
+      }
     }
   }
 
   Future<void> _acceptPurchase(Map<String, dynamic> response) async {
     final result = OrderResult.fromJson(response);
     if (result.saleId == null || result.reference == null) {
-      if (mounted) setState(() {
-        _processing = false;
-        _error = 'La venta aún no tiene referencia de pago. Consulta este mismo intento más tarde.';
-      });
+      if (mounted) {
+        setState(() {
+          _processing = false;
+          _error = 'La venta aún no tiene referencia de pago. Consulta este mismo intento más tarde.';
+        });
+      }
       return;
     }
     if (!mounted) return;
@@ -185,8 +195,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      if (mounted) setState(() => _error =
-          'El pago está confirmado, pero no se pudo cerrar el intento local. Consulta el historial antes de comprar otra vez.');
+      if (mounted) {
+        setState(() => _error =
+            'El pago está confirmado, pero no se pudo cerrar el intento local. Consulta el historial antes de comprar otra vez.');
+      }
     } finally {
       if (mounted) setState(() => _processing = false);
     }
@@ -212,8 +224,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           try {
             await _attempts?.reset();
           } catch (_) {
-            if (mounted) setState(() => _error =
-                'No se pudo cerrar el intento local. Consulta el historial antes de comprar otra vez.');
+            if (mounted) {
+              setState(() => _error =
+                  'No se pudo cerrar el intento local. Consulta el historial antes de comprar otra vez.');
+            }
           }
         }
         if (status != null &&
@@ -736,10 +750,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       });
       context.go('/catalog');
     } catch (_) {
-      if (mounted) setState(() {
-        _processing = false;
-        _error = 'No se pudo cerrar el intento anterior. Conservamos su referencia.';
-      });
+      if (mounted) {
+        setState(() {
+          _processing = false;
+          _error = 'No se pudo cerrar el intento anterior. Conservamos su referencia.';
+        });
+      }
     }
   }
 

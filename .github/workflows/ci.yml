@@ -45,8 +45,9 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgresql+psycopg://fashion:change-me@localhost:5432/fashionstore
-        run: pytest -q
+        run: python -m pytest -q
       - name: Isolated checkout regression tests (SQLite, no seed)
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: sqlite://
           TEST_DATABASE_URL: sqlite://

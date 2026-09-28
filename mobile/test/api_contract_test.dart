@@ -209,7 +209,7 @@ void main() {
 
   group('Product price handling', () {
     test('keeps the price coming from the API', () {
-      final product = Product(
+      const product = Product(
         id: 7,
         name: 'Sudadera Hoodie',
         price: 249.9,

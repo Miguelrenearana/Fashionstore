@@ -42,6 +42,7 @@ export interface ProductVariant {
   color?: string;
   color_name?: string;
   stock: number;
+  available: number;
   price?: number;
   base_price?: number;
   sku?: string;
@@ -90,7 +91,6 @@ interface CartResponse {
     image_url?: string | null;
   }[];
   total: number;
-  discount?: number;
 }
 
 export interface NotificationItem {
@@ -195,11 +195,10 @@ export class ClientService {
   }
 
   // CU-20 - Carrito
-  getCart(): Observable<{ items: CartItem[]; subtotal?: number; discount?: number; total?: number }> {
+  getCart(): Observable<{ items: CartItem[]; total: number }> {
     return this.http.get<CartResponse>(`${environment.apiUrl}/cart`).pipe(
       map((res) => ({
         total: res.total,
-        discount: res.discount,
         items: (res.details ?? []).map((detail): CartItem => ({
           variant_id: detail.variant_id,
           product_id: detail.garment_id ?? undefined,
@@ -228,10 +227,6 @@ export class ClientService {
 
   clearCart(): Observable<any> {
     return this.http.delete(`${environment.apiUrl}/cart`);
-  }
-
-  applyCoupon(code: string): Observable<{ discount: number }> {
-    return this.http.post<{ discount: number }>(`${environment.apiUrl}/cart/coupon`, { code });
   }
 
   // CU-21/25 - Compra y pago

@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 
 from app.core.config import settings
 from app.core.dependencies import CurrentUser, DbSession
-from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.models.sales import Payment, Sale, SalePaymentStatus, SaleStatus
 from app.models.user import Client
 from app.payments.adapters.static_qr_gateway import StaticQRGateway
@@ -18,6 +18,8 @@ from app.payments.domain.service import PaymentService
 from app.payments.factory import get_payment_service
 from app.schemas.payment import PaymentConfirm, PaymentRead
 from app.services.receipt_service import receipt_service
+from app.services.sales_service import sales_service
+from app.services.stock_locking import stock_transaction
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -83,34 +85,48 @@ def confirm_payment(
     ref = payload.gateway_reference or payload.token
     if not ref:
         raise NotFoundError("Missing payment reference.")
-    payment = db.query(Payment).filter(Payment.gateway_reference == ref).with_for_update().first()
-    if not payment or not payment.sale:
-        raise NotFoundError("Payment or sale not found.")
-    sale = payment.sale
-    roles = {role.name for role in current.roles}
-    owner = db.query(Client).filter(Client.user_id == current.id).first()
-    is_owner = owner is not None and owner.id == sale.client_id
-    is_staff = "ADMIN" in roles or (
-        bool(roles.intersection({"MANAGER", "CASHIER"}))
-        and current.employee is not None
-        and current.employee.is_active
-        and current.employee.branch_id == sale.branch_id
-    )
-    if not (is_owner or is_staff):
-        raise ForbiddenError("You cannot confirm this payment.")
-    # Retries must not charge again, regress a terminal state or reissue a receipt.
-    if payment.status not in (SalePaymentStatus.PENDING, SalePaymentStatus.COMPLETED):
-        return {"reference": ref, "status": payment.status}
-    if payment.status == SalePaymentStatus.PENDING:
-        payment.status = service.status(ref).status
-    if payment.status == SalePaymentStatus.COMPLETED:
-        sale.status = SaleStatus.PAID
-        sale.paid_at = sale.paid_at or datetime.now(UTC)
-        receipt_service.generate(db, sale)
-    elif payment.status == SalePaymentStatus.DECLINED:
-        sale.status = SaleStatus.CANCELLED
-    db.commit()
-    return {"reference": ref, "status": payment.status}
+    with stock_transaction(db):
+        sale_id = db.query(Payment.sale_id).filter(Payment.gateway_reference == ref).scalar()
+        if sale_id is None:
+            raise NotFoundError("Payment or sale not found.")
+        # Serialize all references of one sale before taking reservation/stock locks.
+        sale = (db.query(Sale).filter(Sale.id == sale_id).populate_existing()
+                .with_for_update(of=Sale).one())
+        payment = (db.query(Payment).filter(Payment.gateway_reference == ref)
+                   .populate_existing().with_for_update(of=Payment).one())
+        roles = {role.name for role in current.roles}
+        owner = db.query(Client).filter(Client.user_id == current.id).first()
+        is_owner = owner is not None and owner.id == sale.client_id
+        is_staff = "ADMIN" in roles or (
+            bool(roles.intersection({"MANAGER", "CASHIER"}))
+            and current.employee is not None
+            and current.employee.is_active
+            and current.employee.branch_id == sale.branch_id
+        )
+        if not (is_owner or is_staff):
+            raise ForbiddenError("You cannot confirm this payment.")
+        if payment.status in (SalePaymentStatus.PENDING, SalePaymentStatus.TIMEOUT):
+            status = service.status(ref).status
+            # A timeout is uncertainty, not proof of failure; keep it explicit.
+            if not (payment.status == SalePaymentStatus.TIMEOUT
+                    and status == SalePaymentStatus.PENDING):
+                payment.status = status
+        if payment.status == SalePaymentStatus.COMPLETED:
+            if sale.status in (SaleStatus.CANCELLED, SaleStatus.REFUNDED):
+                raise ConflictError("Closed sale cannot be paid; payment needs reconciliation.")
+            sale.status = SaleStatus.PAID
+            sale.paid_at = sale.paid_at or datetime.now(UTC)
+            receipt_service.generate(db, sale, commit=False)
+        elif payment.status == SalePaymentStatus.DECLINED:
+            other_completed = db.query(Payment.id).filter(
+                Payment.sale_id == sale.id, Payment.id != payment.id,
+                Payment.status == SalePaymentStatus.COMPLETED,
+            ).first()
+            if sale.status == SaleStatus.PENDING and other_completed:
+                raise ConflictError("Another payment completed; confirm that reference first.")
+            sales_service.reject_pending_sale(db, sale, current.id)
+        result = {"reference": ref, "status": payment.status}
+    return result
 
 
 @router.post("/refund")

@@ -5,6 +5,7 @@ from app.models.inventory import Inventory
 from app.models.movement import InventoryMovement, InventoryMovementType
 from app.models.user import Branch, Employee
 from app.services.notification_service import notification_service
+from app.services.stock_locking import lock_stock, stock_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -13,29 +14,28 @@ PHONE_RE_DIGITS = 10
 
 
 def sync_inventory() -> int:
-    """Apply pending IN movements to inventory and flag low stock notifications."""
+    """Apply only queued IN movements once, retaining them as history."""
     db = SessionLocal()
     applied = 0
     try:
-        movements = db.query(InventoryMovement).filter(
-            InventoryMovement.movement_type == InventoryMovementType.IN
-        ).limit(200)
-        for movement in movements:
-            inventory = db.query(Inventory).filter(
-                Inventory.branch_id == movement.branch_id,
-                Inventory.variant_id == movement.variant_id,
-            ).first()
-            if not inventory:
-                inventory = Inventory(
-                    branch_id=movement.branch_id,
-                    variant_id=movement.variant_id,
-                    quantity=0,
+        with stock_transaction(db):
+            # Claim each movement once, then acquire all stock locks in global order.
+            movements = (
+                db.query(InventoryMovement)
+                .filter(
+                    InventoryMovement.movement_type == InventoryMovementType.IN,
+                    InventoryMovement.is_applied.is_(False),
                 )
-                db.add(inventory)
-            inventory.quantity += movement.quantity
-            db.add(movement)
-            db.delete(movement)
-            applied += 1
+                .order_by(InventoryMovement.id).limit(200)
+                .with_for_update(skip_locked=True).all()
+            )
+            stocks = lock_stock(
+                db, ((m.branch_id, m.variant_id) for m in movements), create_missing=True,
+            )
+            for movement in movements:
+                stocks[movement.branch_id, movement.variant_id].quantity += movement.quantity
+                movement.is_applied = True
+                applied += 1
 
         branches = db.query(Branch).all()
         for branch in branches:

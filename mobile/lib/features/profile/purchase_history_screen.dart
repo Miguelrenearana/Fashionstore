@@ -29,7 +29,9 @@ class Purchase {
   final List<PurchaseLine> details;
 
   /// El backend guarda los estados en mayusculas (`COMPLETED`, `REFUNDED`...).
-  bool get isCompleted => status == 'COMPLETED';
+  // The API history returns SaleStatus.PAID after confirmation. Payment
+  // endpoints use COMPLETED, so accept both representations for paid sales.
+  bool get isCompleted => status == 'PAID' || status == 'COMPLETED';
 
   /// El comprobante solo existe cuando la venta esta pagada; el backend
   /// responde 404 con "pay first" en ventas pendientes.
@@ -308,6 +310,7 @@ class _PurchaseCard extends ConsumerWidget {
   }
 
   static AppBadgeVariant _badgeVariant(String status) => switch (status) {
+        'PAID' => AppBadgeVariant.success,
         'COMPLETED' => AppBadgeVariant.success,
         'REFUNDED' => AppBadgeVariant.primary,
         'DECLINED' || 'TIMEOUT' => AppBadgeVariant.error,
@@ -315,6 +318,7 @@ class _PurchaseCard extends ConsumerWidget {
       };
 
   static String _statusLabel(String status) => switch (status) {
+        'PAID' => 'Pagada',
         'COMPLETED' => 'Completada',
         'PENDING' => 'Pendiente',
         'REFUNDED' => 'Reembolsada',

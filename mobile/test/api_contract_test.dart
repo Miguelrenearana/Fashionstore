@@ -99,6 +99,41 @@ void main() {
     });
   });
 
+  group('confirmed mock purchase history and receipt availability', () {
+    test('a PAID sale from history exposes its receipt', () {
+      final purchase = Purchase.fromJson({
+        'id': 14,
+        'invoice_number': 'FAC-MOCK-14',
+        'total_amount': 125.5,
+        'status': 'PAID',
+        'created_at': '2026-09-28T10:00:00Z',
+        'items_count': 1,
+      });
+
+      expect(purchase.isCompleted, isTrue);
+      expect(purchase.hasReceipt, isTrue);
+    });
+
+    test('only a completed payment response is shown as paid', () {
+      const states = ['PENDING', 'DECLINED', 'TIMEOUT'];
+      for (final status in states) {
+        final result = OrderResult.fromJson({
+          'sale': {'invoice_number': 'FAC-1', 'total_amount': 10},
+          'payment': {'status': status, 'gateway_reference': 'mock-ref-1'},
+        });
+        expect(result.paymentStatus, status);
+        expect(result.reference, 'mock-ref-1');
+        expect(isPaymentCompleted(result.paymentStatus), isFalse);
+      }
+      final completed = OrderResult.fromJson({
+        'sale': {'invoice_number': 'FAC-1', 'total_amount': 10},
+        'payment': {'status': 'COMPLETED', 'gateway_reference': 'mock-ref-1'},
+      });
+      expect(completed.paymentStatus, 'COMPLETED');
+      expect(isPaymentCompleted(completed.paymentStatus), isTrue);
+    });
+  });
+
   group('ProductRecommendation.fromJson (CU-30, /ai/recommendations)', () {
     test('parses the flat list item shape', () {
       final rec = ProductRecommendation.fromJson({

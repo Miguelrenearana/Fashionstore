@@ -46,7 +46,7 @@ interface CheckoutPayment {
             <p>No se recibió una referencia de pago. Revisa el historial antes de intentar otra compra.</p>
           }
           <p>Esta consulta conserva la venta existente.</p>
-          @if (payment.status === 'DECLINED' || payment.status === 'TIMEOUT') {
+          @if (payment.status === 'DECLINED') {
             <button class="btn btn-outline" [disabled]="processing" (click)="startNewPurchase()">Empezar otra compra</button>
           }
           <a routerLink="/client/history" class="btn btn-outline">Ver historial de compras</a>
@@ -306,7 +306,7 @@ export class CheckoutComponent implements OnInit {
   }
 
   startNewPurchase(): void {
-    if (!this.payment || this.processing || !['DECLINED', 'TIMEOUT'].includes(this.payment.status)) return;
+    if (!this.payment || this.processing || !['DECLINED'].includes(this.payment.status)) return;
     this.confirmPayment(true);
   }
 
@@ -326,7 +326,7 @@ export class CheckoutComponent implements OnInit {
         this.success = res.status === 'COMPLETED';
         this.processing = false;
         this.savePayment();
-        if (startNew && ['DECLINED', 'TIMEOUT'].includes(res.status)) {
+        if (startNew && ['DECLINED'].includes(res.status)) {
           this.payment = null;
           this.attempt = null;
           this.savePayment();

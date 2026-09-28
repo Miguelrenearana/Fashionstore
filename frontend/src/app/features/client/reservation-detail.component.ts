@@ -27,8 +27,7 @@ import { ClientService } from './client.service';
           <div class="grid-2">
             <div class="info-block">
               <h3>Sucursal</h3>
-              <p>{{ reservation.branch?.name ?? 'Sucursal principal' }}</p>
-              <p class="meta">{{ reservation.branch?.address ?? '' }}</p>
+              <p>{{ reservation.branch_name ?? 'Sucursal no disponible' }}</p>
             </div>
             <div class="info-block">
               <h3>Información</h3>
@@ -46,34 +45,32 @@ import { ClientService } from './client.service';
             <h3 class="items-title">Prendas reservadas</h3>
             <div class="items">
               @for (item of reservation.items; track $index) {
-                <div class="item" [class.unavailable]="!item.available">
+                <div class="item">
                   <div class="thumb" *ngIf="item.image_url">
                     <img [src]="item.image_url" [alt]="''" />
                   </div>
                   <div class="item-info">
                     <p class="item-name">{{ item.product_name }}</p>
                     <p class="item-meta">
-                      {{ item.size || 'Talla única' }} · {{ item.color || '' }} · ×{{ item.quantity }}
+                      {{ item.size_name || 'Talla única' }} · {{ item.color_name || '' }} · ×{{ item.quantity }}
                     </p>
                   </div>
-                  <p class="item-price">S/{{ (item.price ?? 0) * (item.quantity ?? 1) | number:'1.2-2' }}</p>
+                  <p class="item-price">Bs {{ (item.unit_price ?? 0) * (item.quantity ?? 1) | number:'1.2-2' }}</p>
                 </div>
               }
             </div>
           }
 
           <div class="footer">
-            <p class="total">Total: S/{{ reservation.total ?? 0 | number:'1.2-2' }}</p>
+            <p class="total">Total: Bs {{ reservation.total_amount ?? 0 | number:'1.2-2' }}</p>
 
             <div class="timeline">
-              <div class="step" [class.done]="reservation.status !== 'cancelled' && reservation.status !== 'expired'">
-                <span class="dot"></span> Reserva creada
-              </div>
-              <div class="step" [class.done]="['ready', 'picked_up', 'pickedup', 'completed'].includes((reservation.status ?? '').toLowerCase())">
+              <div class="step done"><span class="dot"></span> Reserva creada</div>
+              <div class="step" [class.done]="['PREPARED', 'IN_TRIAL', 'COMPLETED'].includes(reservation.status)">
                 <span class="dot"></span> Prendas preparadas
               </div>
-              <div class="step" [class.done]="(reservation.status ?? '').toLowerCase() === 'picked_up' || (reservation.status ?? '').toLowerCase() === 'pickedup'">
-                <span class="dot"></span> Recogida en tienda
+              <div class="step" [class.done]="['IN_TRIAL', 'COMPLETED'].includes(reservation.status)">
+                <span class="dot"></span> Prueba en tienda
               </div>
             </div>
 
@@ -98,7 +95,7 @@ import { ClientService } from './client.service';
       .title { margin: 0; }
       .badge-status { font-size: 0.8rem; padding: 3px 12px; border-radius: 99px; }
       .st-pending, .st-confirmed { background: #fef3c7; color: #92400e; }
-      .st-ready, .st-picked_up, .st-pickedup { background: #dcfce7; color: #166534; }
+      .st-prepared, .st-in_trial { background: #dcfce7; color: #166534; }
       .st-cancelled, .st-expired { background: #fee2e2; color: #991b1b; }
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
       @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -109,7 +106,6 @@ import { ClientService } from './client.service';
       .items-title { margin: 1.25rem 0 0.75rem; }
       .items { display: flex; flex-direction: column; gap: 0.75rem; }
       .item { display: flex; gap: 1rem; align-items: center; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 10px; }
-      .item.unavailable { opacity: 0.5; }
       .thumb { width: 56px; height: 56px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: var(--color-surface-variant, #f3f4f6); }
       .thumb img { width: 100%; height: 100%; object-fit: cover; }
       .item-info { flex: 1; }
@@ -147,7 +143,7 @@ export class ReservationDetailComponent implements OnInit {
       next: (res: any) => {
         this.reservation = res.reservation ?? res.data ?? res;
         const st = (this.reservation.status ?? '').toLowerCase();
-        this.canCancel = st === 'pending' || st === 'confirmed' || st === 'in_process';
+        this.canCancel = ['pending', 'prepared', 'in_trial'].includes(st);
         this.loading = false;
       },
       error: () => { this.error = 'No se pudo cargar la reserva.'; this.loading = false; },
@@ -155,24 +151,24 @@ export class ReservationDetailComponent implements OnInit {
   }
 
   cancel(): void {
+    if (!this.canCancel || this.cancelling) return;
     if (!confirm('¿Seguro que deseas cancelar esta reserva?')) return;
     this.cancelling = true;
     this.error = '';
     this.api.cancelReservation(this.reservation.id).subscribe({
-      next: () => {
-        this.reservation.status = 'cancelled';
+      next: (updated: any) => {
+        this.reservation.status = updated.status;
         this.canCancel = false;
         this.cancelling = false;
       },
-      error: () => { this.error = 'No se pudo cancelar la reserva.'; this.cancelling = false; },
+      error: () => { this.error = 'No se pudo cancelar la reserva. Vuelve a cargar la reserva para consultar su estado.'; this.cancelling = false; },
     });
   }
 
   statusLabel(status: string): string {
     const map: Record<string, string> = {
-      pending: 'Pendiente', confirmed: 'Confirmada', ready: 'Lista para recoger',
-      picked_up: 'Recogida', pickedup: 'Recogida', cancelled: 'Cancelada',
-      expired: 'Expirada', completed: 'Completada',
+      pending: 'Pendiente', prepared: 'Preparada', in_trial: 'En prueba',
+      cancelled: 'Cancelada', expired: 'Expirada', completed: 'Completada',
     };
     return map[(status ?? '').toLowerCase()] ?? status ?? 'Desconocido';
   }

@@ -8,7 +8,9 @@ from app.models.sales import Receipt, Sale
 class ReceiptService:
     """CU-24: issue the comprobante (invoice) for a sale."""
 
-    def generate(self, db: Session, sale: Sale, receipt_type: str = "invoice") -> Receipt:
+    def generate(
+        self, db: Session, sale: Sale, receipt_type: str = "invoice", *, commit: bool = True
+    ) -> Receipt:
         existing = (
             db.query(Receipt)
             .filter(Receipt.sale_id == sale.id, Receipt.type == receipt_type)
@@ -27,7 +29,10 @@ class ReceiptService:
             document_url=f"https://fashionstore.dev/receipts/{sale.invoice_number}.pdf",
         )
         db.add(receipt)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(receipt)
         return receipt
 

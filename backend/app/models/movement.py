@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base, TimestampMixin
@@ -49,5 +49,10 @@ class InventoryMovement(Base, TimestampMixin):
     movement_type: Mapped[str] = mapped_column(String(10), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str | None] = mapped_column(String(120))
+    # Historical entries are already reflected in stock. Only explicitly queued
+    # movements (is_applied=False) may be processed by inventory_sync.
+    is_applied: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
 
     variant = relationship("GarmentVariant")

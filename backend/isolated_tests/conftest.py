@@ -24,7 +24,18 @@ from app.api.v1.routes_sales import router as sales_router
 from app.core.database import Base, get_db
 from app.core.exceptions import AppError
 from app.core.security import create_access_token
-from app.models import Branch, Category, City, Client, Color, Garment, GarmentVariant, Inventory, Size, User
+from app.models import (
+    Branch,
+    Category,
+    City,
+    Client,
+    Color,
+    Garment,
+    GarmentVariant,
+    Inventory,
+    Size,
+    User,
+)
 from app.payments.api.v1.payments import router as payments_router
 from app.payments.factory import get_payment_service
 

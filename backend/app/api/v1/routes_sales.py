@@ -24,8 +24,10 @@ def create_sale(db: DbSession, payload: SaleGenerate, current: CurrentUser):
         if not reservation:
             raise NotFoundError("Reservation not found.")
         owner = db.query(Client).filter(Client.user_id == current.id).first()
-        if not is_staff and not (owner and owner.id == reservation.client_id):
-            raise ForbiddenError("Only staff or the reservation owner can sell a reservation.")
+        is_admin = "ADMIN" in {role.name for role in current.roles}
+        assigned_staff = employee and employee.is_active and employee.branch_id == reservation.branch_id
+        if not (is_admin or assigned_staff or (owner and owner.id == reservation.client_id)):
+            raise ForbiddenError("Only staff of this branch or the reservation owner can sell it.")
     elif not is_staff:
         raise ForbiddenError("Only staff can register a direct sale.")
     sale = sales_service.create_sale(

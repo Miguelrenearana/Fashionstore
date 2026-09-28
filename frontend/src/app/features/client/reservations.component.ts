@@ -35,7 +35,7 @@ import { ClientService } from './client.service';
               </div>
               <div class="res-row">
                 <span class="meta">Sucursal:</span>
-                <span>{{ r.branch?.name ?? 'Sucursal principal' }}</span>
+                <span>{{ r.branch_name ?? 'Sucursal no disponible' }}</span>
               </div>
               @if (r.reservation_code) {
                 <div class="res-row">
@@ -55,7 +55,7 @@ import { ClientService } from './client.service';
               }
               <div class="res-row total">
                 <span class="meta">Total:</span>
-                <span>S/{{ r.total ?? 0 | number:'1.2-2' }}</span>
+                <span>Bs {{ r.total_amount ?? 0 | number:'1.2-2' }}</span>
               </div>
             </a>
           }
@@ -76,7 +76,7 @@ import { ClientService } from './client.service';
       .res-row.total { border-top: 1px solid var(--color-border); margin-top: 0.5rem; padding-top: 0.6rem; font-weight: 600; }
       .badge-status { font-size: 0.75rem; padding: 2px 10px; border-radius: 99px; }
       .st-pending, .st-confirmed { background: #fef3c7; color: #92400e; }
-      .st-ready, .st-pickedup { background: #dcfce7; color: #166534; }
+      .st-prepared, .st-in_trial { background: #dcfce7; color: #166534; }
       .st-cancelled, .st-expired { background: #fee2e2; color: #991b1b; }
       .loading { text-align: center; color: var(--color-text-muted); padding: 4rem 0; }
       .empty { text-align: center; padding: 3rem 1rem; }
@@ -109,13 +109,16 @@ export class ReservationsComponent implements OnInit {
 
   statusLabel(status: string): string {
     const map: Record<string, string> = {
-      pending: 'Pendiente', confirmed: 'Confirmada', ready: 'Lista para recoger',
-      picked_up: 'Recogida', pickedup: 'Recogida', cancelled: 'Cancelada', expired: 'Expirada',
+      pending: 'Pendiente', prepared: 'Preparada', in_trial: 'En prueba',
+      completed: 'Completada', cancelled: 'Cancelada', expired: 'Expirada',
     };
     return map[(status ?? '').toLowerCase()] ?? status ?? 'Desconocido';
   }
 
   itemsLabel(items: any[]): string {
-    return items.map((i) => `${i.product_name ?? 'Producto'} ×${i.quantity}`).join(', ');
+    return items.map((i) => {
+      const variant = [i.size_name, i.color_name].filter(Boolean).join(', ');
+      return `${i.product_name ?? 'Producto'}${variant ? ` (${variant})` : ''} x${i.quantity}`;
+    }).join(', ');
   }
 }

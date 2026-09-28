@@ -5,6 +5,7 @@ from app.models.catalog import GarmentVariant
 from app.models.inventory import Inventory
 from app.models.movement import InventoryMovement, InventoryMovementType
 from app.schemas.inventory import InventoryAdjust
+from app.services.stock_locking import lock_stock, stock_transaction
 
 
 class InventoryService:
@@ -52,32 +53,26 @@ class InventoryService:
         return query.order_by(InventoryMovement.id.desc()).all()
 
     def adjust(self, db: Session, branch_id: int, variant_id: int, payload: InventoryAdjust) -> Inventory:
-        inventory = (
-            db.query(Inventory)
-            .filter(Inventory.branch_id == branch_id, Inventory.variant_id == variant_id)
-            .first()
-        )
-        if not inventory:
-            inventory = Inventory(branch_id=branch_id, variant_id=variant_id, quantity=0)
-            db.add(inventory)
-        new_quantity = inventory.quantity + payload.quantity
-        if new_quantity < 0:
-            raise ValidationError("Resulting stock cannot be negative.")
-        if new_quantity < inventory.reserved_quantity:
-            raise ValidationError("Stock cannot be lower than the reserved quantity.")
-        inventory.quantity = new_quantity
-        db.add(
-            InventoryMovement(
-                branch_id=branch_id,
-                variant_id=variant_id,
-                movement_type=(
-                    InventoryMovementType.IN if payload.quantity >= 0 else InventoryMovementType.OUT
-                ),
-                quantity=abs(payload.quantity),
-                reason=payload.reason,
+        with stock_transaction(db):
+            inventory = lock_stock(db, [(branch_id, variant_id)], create_missing=True)[branch_id, variant_id]
+            new_quantity = inventory.quantity + payload.quantity
+            if new_quantity < 0:
+                raise ValidationError("Resulting stock cannot be negative.")
+            if new_quantity < inventory.reserved_quantity:
+                raise ValidationError("Stock cannot be lower than the reserved quantity.")
+            inventory.quantity = new_quantity
+            db.add(
+                InventoryMovement(
+                    branch_id=branch_id,
+                    variant_id=variant_id,
+                    movement_type=(
+                        InventoryMovementType.IN if payload.quantity >= 0 else InventoryMovementType.OUT
+                    ),
+                    quantity=abs(payload.quantity),
+                    reason=payload.reason,
+                    is_applied=True,
+                )
             )
-        )
-        db.commit()
         db.refresh(inventory)
         return inventory
 

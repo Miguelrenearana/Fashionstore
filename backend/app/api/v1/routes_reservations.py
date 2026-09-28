@@ -11,9 +11,6 @@ from app.services.reservation_service import reservation_service
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
-_STAFF_ROLES = ("ADMIN", "MANAGER", "CASHIER")
-
-
 def _with_details(db):
     """Carga lo necesario para que el cliente no tenga que consultar el catalogo.
 
@@ -55,13 +52,12 @@ def my_reservations(db: DbSession, current: CurrentUser):
 @router.get("", response_model=list[ReservationRead])
 def list_reservations(db: DbSession, current: CurrentUser, status: str | None = None):
     """CU-17/18: staff view of reservations (e.g. what to prepare)."""
-    user_roles = {r.name for r in current.roles}
-    is_staff = bool(user_roles.intersection(_STAFF_ROLES)) or db.query(Employee).filter(
-        Employee.user_id == current.id
-    ).first()
+    is_staff, branch_id = _staff_scope(db, current)
     if not is_staff:
         raise ForbiddenError("Only staff can list reservations.")
     query = _with_details(db)
+    if branch_id is not None:
+        query = query.filter(Reservation.branch_id == branch_id)
     if status:
         query = query.filter(Reservation.status == status.upper())
     return query.order_by(Reservation.id.desc()).all()
@@ -70,7 +66,7 @@ def list_reservations(db: DbSession, current: CurrentUser, status: str | None = 
 @router.get("/{reservation_id}", response_model=ReservationRead)
 def get_reservation(db: DbSession, reservation_id: int, current: CurrentUser):
     reservation = _must_get(db, reservation_id)
-    _guard_owner_or_staff(db, reservation, current, allow_staff=True)
+    _guard_owner_or_staff(db, reservation, current)
     return reservation
 
 
@@ -79,13 +75,10 @@ def change_status(
     db: DbSession, reservation_id: int, payload: ReservationAction, current: CurrentUser
 ):
     reservation = _must_get(db, reservation_id)
-    user_roles = {r.name for r in current.roles}
-    is_staff = bool(user_roles.intersection(_STAFF_ROLES)) or db.query(Employee).filter(
-        Employee.user_id == current.id
-    ).first()
-    if not is_staff:
-        client = _client_id_for(db, current)
-        if client != reservation.client_id:
+    is_staff, branch_id = _staff_scope(db, current)
+    if not is_staff or (branch_id is not None and branch_id != reservation.branch_id):
+        client = db.query(Client).filter(Client.user_id == current.id).first()
+        if not client or client.id != reservation.client_id:
             raise ForbiddenError("You cannot access this reservation.")
         if payload.status.upper() != ReservationStatus.CANCELLED.value:
             # El cliente solo puede cancelar; el resto de estados son de staff.
@@ -113,8 +106,19 @@ def _must_get(db, reservation_id: int) -> Reservation:
     return reservation
 
 
-def _guard_owner_or_staff(db, reservation: Reservation, current: CurrentUser, allow_staff: bool):
-    if allow_staff and db.query(Employee).filter(Employee.user_id == current.id).first():
+def _staff_scope(db, current: CurrentUser) -> tuple[bool, int | None]:
+    """Admins see all branches; active employees see only their assigned branch."""
+    if "ADMIN" in {role.name for role in current.roles}:
+        return True, None
+    employee = db.query(Employee).filter(
+        Employee.user_id == current.id, Employee.is_active.is_(True)
+    ).first()
+    return (True, employee.branch_id) if employee else (False, None)
+
+
+def _guard_owner_or_staff(db, reservation: Reservation, current: CurrentUser):
+    is_staff, branch_id = _staff_scope(db, current)
+    if is_staff and (branch_id is None or branch_id == reservation.branch_id):
         return
     owner = db.query(Client).filter(Client.user_id == current.id).first()
     if not owner or owner.id != reservation.client_id:

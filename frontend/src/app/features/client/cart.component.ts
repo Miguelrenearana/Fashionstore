@@ -1,13 +1,12 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { ClientService, CartItem } from './client.service';
 
 @Component({
   selector: 'app-client-cart',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, RouterLink],
   template: `
     <div class="page">
       <h1 class="page-title">Carrito de compras</h1>
@@ -15,10 +14,6 @@ import { ClientService, CartItem } from './client.service';
 
       @if (error) {
         <div class="alert alert-error">{{ error }}</div>
-      }
-
-      @if (couponMsg) {
-        <div class="alert alert-success">{{ couponMsg }}</div>
       }
 
       @if (loading) {
@@ -45,14 +40,14 @@ import { ClientService, CartItem } from './client.service';
                   <p class="meta">
                     {{ item.size || 'Talla única' }} · {{ item.color || '' }}
                   </p>
-                  <p class="unit-price">S/{{ item.price | number:'1.2-2' }} c/u</p>
+                  <p class="unit-price">Bs {{ item.price | number:'1.2-2' }} c/u</p>
                 </div>
                 <div class="qty-control">
                   <button type="button" class="qty-btn" (click)="changeQty(item, item.quantity - 1)" [disabled]="item.quantity <= 1 || updating.has(item.variant_id)">−</button>
                   <span class="qty-value">{{ item.quantity }}</span>
                   <button type="button" class="qty-btn" (click)="changeQty(item, item.quantity + 1)" [disabled]="updating.has(item.variant_id)">+</button>
                 </div>
-                <p class="line-total">S/{{ (item.price * item.quantity) | number:'1.2-2' }}</p>
+                <p class="line-total">Bs {{ (item.price * item.quantity) | number:'1.2-2' }}</p>
                 <button type="button" class="btn btn-ghost btn-sm" (click)="remove(item)">Eliminar</button>
               </div>
             }
@@ -60,17 +55,8 @@ import { ClientService, CartItem } from './client.service';
 
           <aside class="summary card">
             <h2 class="summary-title">Resumen del pedido</h2>
-            <div class="row"><span>Subtotal</span><span>S/{{ subtotal | number:'1.2-2' }}</span></div>
-            @if (discount > 0) {
-              <div class="row"><span>Descuento</span><span>-S/{{ discount | number:'1.2-2' }}</span></div>
-            }
-            <div class="row"><span>Envío</span><span>{{ shipping === 0 ? 'Gratis' : 'S/' + (shipping | number:'1.2-2') }}</span></div>
-            <div class="row total"><span>Total</span><span>S/{{ total | number:'1.2-2' }}</span></div>
-
-            <div class="coupon">
-              <input type="text" class="input" placeholder="Código de cupón" [(ngModel)]="couponCode" />
-              <button type="button" class="btn btn-outline btn-sm" (click)="applyCoupon()">Aplicar</button>
-            </div>
+            <div class="row"><span>Subtotal</span><span>Bs {{ subtotal | number:'1.2-2' }}</span></div>
+            <div class="row total"><span>Total de prendas</span><span>Bs {{ total | number:'1.2-2' }}</span></div>
 
             <a routerLink="/client/checkout" class="btn btn-primary w-full" (click)="goCheckout($event)">Proceder al pago</a>
           </aside>
@@ -101,8 +87,6 @@ import { ClientService, CartItem } from './client.service';
       .summary-title { margin: 0 0 1rem; font-size: 1.1rem; }
       .row { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.9rem; }
       .row.total { border-top: 1px solid var(--color-border); margin-top: 0.5rem; padding-top: 0.75rem; font-weight: 700; font-size: 1.05rem; }
-      .coupon { display: flex; gap: 0.5rem; margin: 1rem 0; }
-      .coupon .input { flex: 1; }
       .w-full { width: 100%; text-align: center; }
       .empty { text-align: center; padding: 3rem 1rem; }
       .empty p { margin-bottom: 1rem; }
@@ -116,14 +100,10 @@ export class CartComponent implements OnInit {
   updating = new Set<number>();
   loading = false;
   error = '';
-  couponMsg = '';
 
   subtotal = 0;
-  discount = 0;
-  shipping = 99;
   total = 0;
 
-  couponCode = '';
 
   ngOnInit(): void {
     this.load();
@@ -135,10 +115,8 @@ export class CartComponent implements OnInit {
     this.api.getCart().subscribe({
       next: (res) => {
         this.items = res.items ?? [];
-        this.discount = res.discount ?? 0;
         this.subtotal = this.items.reduce((s, i) => s + i.price * i.quantity, 0);
-        this.shipping = this.subtotal >= 999 ? 0 : 99;
-        this.total = Math.max(0, this.subtotal - this.discount + this.shipping);
+        this.total = res.total ?? this.subtotal;
         this.loading = false;
       },
       error: () => { this.error = 'No se pudo cargar el carrito.'; this.loading = false; },
@@ -171,22 +149,9 @@ export class CartComponent implements OnInit {
     });
   }
 
-  applyCoupon(): void {
-    if (!this.couponCode.trim()) return;
-    this.api.applyCoupon(this.couponCode.trim()).subscribe({
-      next: (res) => {
-        this.discount = res.discount ?? 0;
-        this.couponMsg = `Cupón ${this.couponCode} aplicado.`;
-        this.recalc();
-      },
-      error: () => (this.error = 'El cupón no es válido.'),
-    });
-  }
-
   private recalc(): void {
     this.subtotal = this.items.reduce((s, i) => s + i.price * i.quantity, 0);
-    this.shipping = this.subtotal >= 999 ? 0 : 99;
-    this.total = Math.max(0, this.subtotal - this.discount + this.shipping);
+    this.total = this.subtotal;
   }
 
   goCheckout(e: Event): void {

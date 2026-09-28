@@ -42,10 +42,10 @@ class CartService:
         query = db.query(Inventory).filter(Inventory.variant_id == variant_id)
         if cart.branch_id:
             inventory = query.filter(Inventory.branch_id == cart.branch_id).first()
-            if inventory:
+            if inventory and inventory.available > 0:
                 return inventory
             return None
-        inventory = query.filter(Inventory.quantity > 0).order_by(Inventory.id).first()
+        inventory = query.filter(Inventory.quantity > Inventory.reserved_quantity).order_by(Inventory.id).first()
         if inventory:
             cart.branch_id = inventory.branch_id
             return inventory

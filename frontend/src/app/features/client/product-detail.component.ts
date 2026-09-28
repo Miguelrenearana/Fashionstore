@@ -41,11 +41,11 @@ interface ColorOption { name: string; variants: ProductVariant[]; }
 
           <p class="price">
             <ng-container *ngIf="product.min_price && product.base_price && product.min_price < product.base_price; else singlePrice">
-              <span class="old">S/{{ product.base_price | number:'1.2-2' }}</span>
-              S/{{ product.min_price | number:'1.2-2' }}
+              <span class="old">Bs {{ product.base_price | number:'1.2-2' }}</span>
+              Bs {{ product.min_price | number:'1.2-2' }}
               <span class="disc" *ngIf="product.discount_percentage">-{{ product.discount_percentage }}%</span>
             </ng-container>
-            <ng-template #singlePrice>S/{{ product.min_price ?? product.base_price ?? product.price | number:'1.2-2' }}</ng-template>
+            <ng-template #singlePrice>Bs {{ product.min_price ?? product.base_price ?? product.price | number:'1.2-2' }}</ng-template>
           </p>
 
           @if (product.description) {
@@ -75,12 +75,6 @@ interface ColorOption { name: string; variants: ProductVariant[]; }
             </div>
           }
 
-          @if (selectedVariant) {
-            <p class="stock" [class.out]="selectedVariant.stock <= 0">
-              {{ selectedVariant.stock > 0 ? 'Disponible en tienda' : 'Agotado temporalmente' }}
-            </p>
-          }
-
           <div class="branch-avail card">
             <h3 class="avail-title">Disponibilidad por sucursal</h3>
             <p class="avail-hint" *ngIf="!selectedVariant">Selecciona una talla y color para consultar disponibilidad.</p>
@@ -96,7 +90,7 @@ interface ColorOption { name: string; variants: ProductVariant[]; }
                 <p class="avail-hint">Consultando disponibilidad...</p>
               } @else if (branchStock !== null) {
                 <p class="branch-stock" [class.out]="branchStock <= 0">
-                  {{ branchStock > 0 ? '✓ ' + branchStock + ' unidades en esta sucursal' : '✗ Sin stock en esta sucursal' }}
+                  {{ branchStock > 0 ? branchStock + ' unidades disponibles en esta sucursal' : 'Sin unidades disponibles en esta sucursal' }}
                 </p>
               }
             </ng-container>
@@ -264,6 +258,7 @@ export class ProductDetailComponent implements OnInit {
     }
     this.selectedVariant = this.findVariant();
     this.branchStock = null;
+    this.checkingStock = false;
   }
 
   onColorChange(): void {
@@ -275,27 +270,28 @@ export class ProductDetailComponent implements OnInit {
     }
     this.selectedVariant = this.findVariant();
     this.branchStock = null;
+    this.checkingStock = false;
   }
 
   loadBranchAvailability(): void {
-    if (!this.selectedVariant || !this.selectedBranchId) return;
+    if (!this.selectedVariant || !this.selectedBranchId) { this.branchStock = null; this.checkingStock = false; return; }
     this.checkingStock = true;
     this.branchStock = null;
-    // The catalog endpoint filters by branch; here we use the product detail with branch_id hint.
-    this.api.getBranchAvailability(this.product.id, this.selectedBranchId).subscribe({
+    const branchId = this.selectedBranchId;
+    const variantId = this.selectedVariant.id;
+    this.api.getBranchAvailability(this.product.id, branchId).subscribe({
       next: (res: any) => {
-          const p = res.item ?? res.product ?? res.data ?? res;
-          const variants = (p.variants ?? []);
-          const match = variants.find(
-            (v: any) => (v.size_name ?? v.size) === this.selectedVariant!.size &&
-                         (v.color_name ?? v.color) === this.selectedVariant!.color
-          );
-          this.branchStock = match ? (match.stock ?? match.inventory ?? (match.in_stock ? 1 : 0)) : (p.stock ?? 0);
+        if (this.selectedBranchId !== branchId || this.selectedVariant?.id !== variantId) return;
+        const p = res.item ?? res.product ?? res.data ?? res;
+        const match = (p.variants ?? []).find((v: any) => v.id === variantId);
+        this.branchStock = match?.available ?? 0;
         this.checkingStock = false;
       },
       error: () => {
+        if (this.selectedBranchId !== branchId || this.selectedVariant?.id !== variantId) return;
         this.branchStock = null;
         this.checkingStock = false;
+        this.error = 'No se pudo consultar la disponibilidad de esta sucursal.';
       },
     });
   }
@@ -317,8 +313,20 @@ export class ProductDetailComponent implements OnInit {
       this.error = 'Selecciona talla y color primero.';
       return;
     }
+    if (!this.selectedBranchId) {
+      this.error = 'Elige una sucursal antes de reservar.';
+      return;
+    }
+    if (this.checkingStock || this.branchStock === null) {
+      this.error = 'Consulta la disponibilidad de la sucursal antes de reservar.';
+      return;
+    }
+    if (this.branchStock < this.quantity) {
+      this.error = 'No hay unidades disponibles suficientes en esta sucursal.';
+      return;
+    }
     this.error = '';
-    this.api.createReservation([{ variant_id: this.selectedVariant.id, quantity: this.quantity }], this.selectedBranchId ?? undefined).subscribe({
+    this.api.createReservation([{ variant_id: this.selectedVariant.id, quantity: this.quantity }], this.selectedBranchId).subscribe({
       next: () => { this.actionMsg = '¡Reserva creada! Revisala en "Mis reservas".'; },
       error: () => (this.error = 'No se pudo crear la reserva.'),
     });

@@ -7,6 +7,7 @@ import '../../core/design/design.dart';
 import '../../core/network/api_client.dart';
 import '../../core/di/providers.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import 'checkout_attempt.dart';
 import 'cart_controller.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -26,6 +27,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _method = 'static_qr';
   bool _qrPolling = false;
   String? _paymentStatus;
+  String? _gateway;
+  CheckoutAttemptCoordinator? _attempts;
+  bool _ready = false;
 
   OrderResult? _result;
 
@@ -36,7 +40,39 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _pickup = false;
 
   @override
+  void initState() {
+    super.initState();
+    _restoreAttempt();
+  }
+
+  Future<void> _restoreAttempt() async {
+    if (mounted) setState(() => _error = null);
+    try {
+      final api = ref.read(apiClientProvider);
+      final user = await api.get('/users/me');
+      final config = await api.get('/payments/config');
+      final attempts = CheckoutAttemptCoordinator(
+        gateway: ApiCheckoutPurchaseGateway(api),
+        store: const SecureCheckoutAttemptStore(),
+        userId: user['id'] as int,
+      );
+      await attempts.restore();
+      if (!mounted) return;
+      setState(() {
+        _attempts = attempts;
+        _gateway = config['gateway'] as String?;
+        _ready = true;
+      });
+      if (attempts.attempt != null) await _recoverPurchase();
+    } catch (_) {
+      if (mounted) setState(() => _error =
+          'No se pudo recuperar el intento anterior. Vuelve a consultar antes de comprar.');
+    }
+  }
+
+  @override
   void dispose() {
+    _qrPolling = false;
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -45,35 +81,114 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
+    if (_processing || !_ready) return;
+    if (_attempts?.attempt != null) {
+      await _recoverPurchase();
+      return;
+    }
     setState(() {
       _processing = true;
       _error = null;
     });
     try {
-      final res = await ref.read(apiClientProvider).post('/cart/purchase', data: {
-        if (!_pickup)
-          'shipping_address': {
-            'name': _nameController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'address': _addressController.text.trim(),
-            'city': _cityController.text.trim(),
-          },
-        'payment_method': _method,
-      });
-      final result = OrderResult.fromJson(res);
-      _result = result;
-      _paymentStatus = result.paymentStatus;
-      await ref.read(cartControllerProvider.notifier).clear();
-      if (!mounted) return;
-      setState(() => _step = 3);
-      if (result.reference != null) _startPolling(result.reference!);
+      final res = await _attempts!.start(_method);
+      await _acceptPurchase(res);
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
+          _error = _attempts?.attempt == null
+              ? e.message
+              : 'No sabemos si se creó la venta. Recupera este intento antes de comprar otra vez.';
           _processing = false;
         });
       }
+    } catch (_) {
+      if (mounted) setState(() {
+        _error = 'No se pudo guardar o verificar el intento. No se enviará otra compra.';
+        _processing = false;
+      });
+    }
+  }
+
+  Future<void> _recoverPurchase() => _runExistingAttempt(() => _attempts!.recover());
+
+  Future<void> _retryAttempt() => _runExistingAttempt(() => _attempts!.retry());
+
+  Future<void> _runExistingAttempt(
+      Future<Map<String, dynamic>> Function() request) async {
+    if (_processing || _attempts?.attempt == null) return;
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+    try {
+      await _acceptPurchase(await request());
+    } on ApiException catch (e) {
+      if (mounted) setState(() {
+        _processing = false;
+        _error = e.statusCode == 404
+            ? 'Aún no se encontró la venta. Puedes reintentar el mismo intento sin duplicarla.'
+            : 'No se pudo recuperar la compra. Conservamos el intento para consultar de nuevo.';
+      });
+    } catch (_) {
+      if (mounted) setState(() {
+        _processing = false;
+        _error = 'No se pudo verificar la compra. Conservamos el intento para consultar de nuevo.';
+      });
+    }
+  }
+
+  Future<void> _acceptPurchase(Map<String, dynamic> response) async {
+    final result = OrderResult.fromJson(response);
+    if (result.saleId == null || result.reference == null) {
+      if (mounted) setState(() {
+        _processing = false;
+        _error = 'La venta aún no tiene referencia de pago. Consulta este mismo intento más tarde.';
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _result = result;
+      _paymentStatus = result.paymentStatus;
+      _step = 3;
+      _processing = false;
+    });
+    await ref.read(cartControllerProvider.notifier).clear();
+    if (!mounted) return;
+    if (_gateway == 'mock') {
+      await _confirmMockPayment();
+    } else {
+      _startPolling(result.reference!);
+    }
+  }
+
+  /// Confirms the existing mock reference. This never creates another sale;
+  /// retries use the same reference and the backend enforces sale ownership.
+  Future<void> _confirmMockPayment() async {
+    final reference = _result?.reference;
+    if (reference == null || _processing) return;
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+    try {
+      final response = await ref.read(apiClientProvider).post(
+        '/payments/confirm',
+        data: {'gateway_reference': reference},
+      );
+      if (mounted) {
+        setState(() => _paymentStatus =
+            response['status'] as String? ?? _paymentStatus);
+        if (isPaymentCompleted(_paymentStatus)) await _attempts?.reset();
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error =
+          'El pago está confirmado, pero no se pudo cerrar el intento local. Consulta el historial antes de comprar otra vez.');
+    } finally {
+      if (mounted) setState(() => _processing = false);
     }
   }
 
@@ -93,6 +208,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             .get('/payments/qr/status/$reference');
         final status = res['status'] as String?;
         if (mounted) setState(() => _paymentStatus = status);
+        if (isPaymentCompleted(status)) {
+          try {
+            await _attempts?.reset();
+          } catch (_) {
+            if (mounted) setState(() => _error =
+                'No se pudo cerrar el intento local. Consulta el historial antes de comprar otra vez.');
+          }
+        }
         if (status != null &&
             const {'COMPLETED', 'DECLINED', 'REFUNDED', 'TIMEOUT'}.contains(status)) {
           if (mounted) setState(() => _qrPolling = false);
@@ -109,6 +232,48 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(cartControllerProvider);
     final theme = Theme.of(context);
+
+    if (!_ready) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Checkout')),
+        body: Center(child: _error == null
+            ? const CircularProgressIndicator()
+            : Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: AppSpacing.x3),
+                AppButton(label: 'Volver a consultar', onPressed: _restoreAttempt),
+              ])),
+      );
+    }
+
+    if (_attempts?.attempt != null && _result == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Compra por verificar')),
+        body: Center(child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.x6),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('No sabemos todavía si se creó la venta. Consulta este intento antes de iniciar otra compra.'),
+            if (_error != null) ...[
+              const SizedBox(height: AppSpacing.x3),
+              Text(_error!),
+            ],
+            const SizedBox(height: AppSpacing.x3),
+            AppButton(
+              label: 'Recuperar / consultar venta',
+              loading: _processing,
+              onPressed: _processing ? null : _recoverPurchase,
+            ),
+            if (_attempts!.canRetry) ...[
+              const SizedBox(height: AppSpacing.x3),
+              AppButton(
+                label: 'Reintentar el mismo intento',
+                onPressed: _processing ? null : _retryAttempt,
+              ),
+            ],
+          ]),
+        )),
+      );
+    }
 
     if (state.items.isEmpty && _step != 3) {
       return Scaffold(
@@ -402,8 +567,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Widget _buildSuccess() {
     final theme = Theme.of(context);
     final result = _result;
-    final paid = _paymentStatus == 'COMPLETED';
-    final failed = const {'DECLINED', 'TIMEOUT'}.contains(_paymentStatus);
+    final paid = isPaymentCompleted(_paymentStatus);
+    final failed = canStartNewPurchaseAfterPayment(_paymentStatus);
     final reference = result?.reference;
 
     return Center(
@@ -449,9 +614,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               const SizedBox(height: AppSpacing.x2),
               Text(
                 failed
-                    ? 'No se realizo el cobro. Puedes reintentar desde el historial.'
+                    ? 'El pago fue rechazado o vencio. Conserva esta referencia para consultar su estado.'
                     : paid
                         ? 'Tu compra quedo registrada. Puedes revisarla en tu historial.'
+                    : _gateway == 'mock'
+                        ? 'La compra existe, pero el pago aún no está confirmado. Consulta de nuevo la misma referencia.'
                         : 'Escanea el codigo con tu app bancaria para completar el pago.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium
@@ -475,7 +642,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ],
-              if (reference != null && !paid) ...[
+              if (reference != null && !paid && _gateway != 'mock') ...[
                 const SizedBox(height: AppSpacing.x4),
                 AppCard(
                   child: Column(
@@ -514,6 +681,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ],
+              if (_gateway == 'mock' && reference != null && !paid) ...[
+                const SizedBox(height: AppSpacing.x3),
+                AppButton(
+                  label: 'Consultar pago nuevamente',
+                  loading: _processing,
+                  onPressed: _processing ? null : _confirmMockPayment,
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.x2),
+                AppBadge(
+                  label: _error!,
+                  variant: AppBadgeVariant.error,
+                  icon: Icons.error_outline,
+                ),
+              ],
+              if (failed) ...[
+                const SizedBox(height: AppSpacing.x3),
+                AppButton(
+                  label: 'Empezar otra compra',
+                  onPressed: _processing ? null : _startNewPurchase,
+                ),
+              ],
               const SizedBox(height: AppSpacing.x6),
               AppButton(
                 label: 'Ver historial de compras',
@@ -530,6 +720,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _startNewPurchase() async {
+    if (_processing || !canStartNewPurchaseAfterPayment(_paymentStatus)) return;
+    setState(() => _processing = true);
+    try {
+      await _attempts?.reset();
+      if (!mounted) return;
+      setState(() {
+        _result = null;
+        _paymentStatus = null;
+        _step = 0;
+        _processing = false;
+      });
+      context.go('/catalog');
+    } catch (_) {
+      if (mounted) setState(() {
+        _processing = false;
+        _error = 'No se pudo cerrar el intento anterior. Conservamos su referencia.';
+      });
+    }
   }
 
   Widget _kv(ThemeData theme, String label, String value) {
@@ -565,7 +776,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       case 'REFUNDED':
         return 'Reembolsado';
       case 'TIMEOUT':
-        return 'A timeout';
+        return 'Resultado incierto (TIMEOUT)';
       case 'PENDING':
         return 'Pendiente';
       default:
@@ -577,6 +788,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 /// Resultado de `POST /cart/purchase` (CU-21 / CU-25).
 class OrderResult {
   const OrderResult({
+    required this.saleId,
     required this.invoiceNumber,
     required this.total,
     required this.saleStatus,
@@ -584,6 +796,7 @@ class OrderResult {
     this.reference,
   });
 
+  final int? saleId;
   final String invoiceNumber;
   final double total;
   final String saleStatus;
@@ -594,6 +807,7 @@ class OrderResult {
     final sale = json['sale'] as Map<String, dynamic>? ?? const {};
     final payment = json['payment'] as Map<String, dynamic>? ?? const {};
     return OrderResult(
+      saleId: sale['id'] as int?,
       invoiceNumber: sale['invoice_number'] as String? ?? '-',
       total: (sale['total_amount'] as num?)?.toDouble() ?? 0,
       saleStatus: sale['status'] as String? ?? 'PENDING',
@@ -603,7 +817,14 @@ class OrderResult {
   }
 }
 
+/// A sale being created or a reference being returned does not mean the
+/// gateway confirmed payment. Only this terminal response may show success.
+bool isPaymentCompleted(String? status) => status == 'COMPLETED';
+
 String _fmt(double value) {
   final s = value.toStringAsFixed(2);
   return s.endsWith('.00') ? s.substring(0, s.length - 3) : s;
 }
+
+// TIMEOUT keeps the attempt recoverable until the gateway resolves it.
+bool canStartNewPurchaseAfterPayment(String? status) => status == 'DECLINED';

@@ -2,10 +2,10 @@ from datetime import date
 from uuid import uuid4
 
 import pytest
-
 from conftest import auth
+
 from app.core.exceptions import PaymentError
-from app.models import Branch, Employee, Payment, Receipt, Role, Sale
+from app.models import Branch, Employee, Inventory, Payment, Receipt, Role, Sale
 from app.payments.domain.entities import PaymentStatusResult
 from app.payments.factory import get_payment_service
 
@@ -55,11 +55,13 @@ def test_non_completed_status_does_not_issue_receipt(checkout_api, monkeypatch, 
     monkeypatch.setattr(get_payment_service(), 'status', lambda r: PaymentStatusResult(r, status))
     assert confirm(client, owner, ref).json()['status'] == status
     assert db.get(Sale, sale_id).status != 'PAID'
+    assert db.query(Inventory).one().quantity == (10 if status == 'DECLINED' else 8)
     assert db.query(Receipt).count() == 0
     assert client.get(f'/api/v1/sales/{sale_id}/receipt', headers=auth(owner)).status_code == 404
     monkeypatch.setattr(get_payment_service(), 'status', lambda r: PaymentStatusResult(r, 'COMPLETED'))
     final = confirm(client, owner, ref).json()['status']
-    assert final == ('COMPLETED' if status == 'PENDING' else status)
+    assert final == ('COMPLETED' if status in ('PENDING', 'TIMEOUT') else status)
+    assert db.query(Inventory).one().quantity == (10 if status == 'DECLINED' else 8)
     assert db.query(Sale).count() == db.query(Payment).count() == 1
 
 
@@ -144,7 +146,7 @@ def test_completed_payment_repairs_sale_and_receipt_idempotently(checkout_api, m
     assert db.get(Sale, sale_id).status == 'PAID'
     assert paid_at is not None
     assert confirm(client, owner, ref).status_code == 200
-    assert db.get(Sale, sale_id).paid_at == paid_at
+    assert db.get(Sale, sale_id).paid_at.replace(tzinfo=None) == paid_at.replace(tzinfo=None)
     assert db.query(Receipt).count() == 1
 
 
@@ -209,3 +211,21 @@ def test_recovery_of_sale_without_payment_does_not_create_another_sale(checkout_
     assert recovered.json()['payment'] is None
     assert client.post('/api/v1/cart/purchase', headers=headers, json=payload).json() == recovered.json()
     assert db.query(Sale).count() == 1
+
+
+
+def test_cart_skips_branch_with_only_reserved_units(checkout_api):
+    client, db, owner, _, first, variant = checkout_api
+    from app.models import City, Inventory
+
+    first_stock = db.query(Inventory).filter_by(branch_id=first.id, variant_id=variant.id).one()
+    first_stock.quantity = first_stock.reserved_quantity = 1
+    second = Branch(city=City(name="Other", state="Test"), name="Other", address="Other")
+    db.add(Inventory(branch=second, variant=variant, quantity=1, reserved_quantity=0))
+    db.commit()
+
+    response = client.post('/api/v1/cart/items', headers=auth(owner),
+                           json={"variant_id": variant.id, "quantity": 1})
+    assert response.status_code == 200, response.text
+    assert response.json()['branch_id'] == second.id
+    assert first_stock.available == 0

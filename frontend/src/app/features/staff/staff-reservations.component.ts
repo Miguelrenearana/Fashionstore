@@ -19,7 +19,7 @@ interface Reservation {
 const NEXT_ACTIONS: Record<string, string[]> = {
   PENDING: ['PREPARED', 'CANCELLED'],
   PREPARED: ['IN_TRIAL', 'CANCELLED'],
-  IN_TRIAL: ['COMPLETED', 'CANCELLED'],
+  IN_TRIAL: ['CANCELLED'],
 };
 
 @Component({
@@ -73,6 +73,9 @@ const NEXT_ACTIONS: Record<string, string[]> = {
                   <button (click)="changeStatus(r, action)" [disabled]="loading">
                     {{ label(action) }}
                   </button>
+                }
+                @if (r.status === 'IN_TRIAL') {
+                  <span class="sale-hint">Para completar la reserva, registra una venta vinculada a ella.</span>
                 }
               </td>
             </tr>
@@ -136,6 +139,7 @@ const NEXT_ACTIONS: Record<string, string[]> = {
         font-size: 0.75rem;
         color: #64748b;
       }
+      .sale-hint { display: block; color: #64748b; font-size: 0.75rem; }
       button {
         cursor: pointer;
         padding: 0.3rem 0.6rem;
@@ -157,8 +161,6 @@ export class StaffReservationsComponent implements OnInit {
 
   error = '';
   loading = false;
-  selectedBranchId = 1;
-
   filtered() {
     const f = this.statusFilter();
     return this.reservations().filter((r) => !f || r.status === f);
@@ -174,8 +176,6 @@ export class StaffReservationsComponent implements OnInit {
         return 'Marcar preparada';
       case 'IN_TRIAL':
         return 'Iniciar prueba';
-      case 'COMPLETED':
-        return 'Completar / entregar';
       case 'CANCELLED':
         return 'Cancelar';
       default:

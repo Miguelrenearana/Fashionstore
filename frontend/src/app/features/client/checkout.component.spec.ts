@@ -132,7 +132,20 @@ describe('Mock checkout', () => {
     expect(component.success).toBeFalse();
   });
 
-  for (const status of ['DECLINED', 'TIMEOUT']) {
+  it('retains the uncertain attempt after TIMEOUT instead of starting another purchase', () => {
+    createSale();
+    confirmation().flush({ reference: 'mock_test', status: 'TIMEOUT' });
+    const token = component.attempt!.token;
+    component.startNewPurchase();
+    expect(component.attempt!.token).toBe(token);
+    expect(component.payment?.reference).toBe('mock_test');
+    http.expectNone(r => r.url.endsWith('/cart/purchase'));
+    component.confirmPayment();
+    confirmation().flush({ reference: 'mock_test', status: 'COMPLETED' });
+    expect(component.success).toBeTrue();
+  });
+
+  for (const status of ['DECLINED']) {
     it(`allows a fresh cart after rechecking ${status}`, () => {
       createSale();
       confirmation().flush({ reference: 'mock_test', status });

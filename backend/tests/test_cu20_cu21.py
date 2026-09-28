@@ -1,3 +1,7 @@
+from app.models.sales import Sale
+from app.models.user import Client, User
+
+
 def test_cart_update_and_remove_item(client, client_headers):
     r = client.post(
         "/api/v1/cart/items",
@@ -126,18 +130,23 @@ def test_sale_exposes_created_at_items_count_and_details(client, client_headers)
     assert detail["image_url"]
 
 
-def test_sales_mine_only_returns_the_own_client_sales(client, client_headers):
+def test_sales_mine_only_returns_the_own_client_sales(client, client_headers, db):
     """CU-22: ?mine=true no debe exponer ventas de otros clientes."""
-    client.post(
-        "/api/v1/cart/items",
-        json={"variant_id": 1, "quantity": 1},
-        headers=client_headers,
-    )
-    mine = client.get(
+    owner = db.query(Client).join(User).filter(User.email == "client@fashionstore.dev").one()
+    expected_ids = {sale.id for sale in db.query(Sale).filter(Sale.client_id == owner.id)}
+    other_ids = {sale.id for sale in db.query(Sale).filter(Sale.client_id != owner.id)}
+    # El seed contiene ventas propias y ajenas; no depender de su cantidad.
+    assert expected_ids
+    assert other_ids
+
+    response = client.get(
         "/api/v1/sales", params={"mine": "true"}, headers=client_headers
-    ).json()
+    )
+    assert response.status_code == 200, response.text
+    mine = response.json()
 
     assert isinstance(mine, list)
-    assert len(mine) == 1
-    assert mine[0]["client_id"] is not None
+    assert {sale["id"] for sale in mine} == expected_ids
+    assert len(mine) == len(expected_ids)
+    assert all(sale["client_id"] == owner.id for sale in mine)
     assert all(s["details"] for s in mine)

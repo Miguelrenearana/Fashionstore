@@ -1,9 +1,7 @@
 import uuid
 
-from sqlalchemy import text
-
-from app.core.database import SessionLocal
 from app.models.inventory import Inventory
+from app.models.user import Branch
 
 
 def test_list_products_admin(client, admin_headers):
@@ -112,24 +110,23 @@ def test_delete_product_forbidden(client, client_headers):
     assert r.status_code == 403
 
 
-def test_delete_product_with_reserved_stock(client, admin_headers):
+def test_delete_product_with_reserved_stock(client, admin_headers, db):
     garment = _create_garment(client, admin_headers, "Reserved Stock", "RES-001")
     variants = client.get(
         f"/api/v1/products/{garment['id']}/variants", headers=admin_headers
     ).json()
     variant_id = variants[0]["id"]
 
-    with SessionLocal() as db:
-        branch_id = db.execute(text("SELECT id FROM sucursal LIMIT 1")).scalar()
-        db.add(
-            Inventory(
-                branch_id=branch_id,
-                variant_id=variant_id,
-                quantity=10,
-                reserved_quantity=3,
-            )
+    branch = db.query(Branch).order_by(Branch.id).first()
+    db.add(
+        Inventory(
+            branch_id=branch.id,
+            variant_id=variant_id,
+            quantity=10,
+            reserved_quantity=3,
         )
-        db.commit()
+    )
+    db.commit()
 
     r = client.delete(f"/api/v1/products/{garment['id']}", headers=admin_headers)
     assert r.status_code == 422

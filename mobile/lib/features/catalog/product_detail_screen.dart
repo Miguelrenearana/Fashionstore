@@ -6,7 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/design/design.dart';
 import '../../core/di/providers.dart';
 import '../../core/models/catalog.dart';
+import '../../core/models/models.dart' show CartItem;
+import '../../core/network/api_client.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../cart/cart_controller.dart';
 import '../reservations/reservation_controller.dart';
 import 'catalog_controller.dart';
 
@@ -27,6 +30,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   String? _selectedSize;
   String? _selectedColor;
   int _quantity = 1;
+  bool _actionBusy = false;
+  String? _actionError;
+  String _consultPath = '/cart';
 
   @override
   void initState() {
@@ -237,6 +243,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_actionError != null) ...[
+                  Text(_actionError!, style: const TextStyle(color: AppColors.error)),
+                  TextButton(onPressed: () => context.go(_consultPath),
+                    child: const Text('Consultar estado')),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -244,6 +255,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         label: 'Reservar',
                         variant: AppButtonVariant.secondary,
                         icon: Icons.event_available_outlined,
+                        loading: _actionBusy,
                         onPressed: _showReserveSheet,
                       ),
                     ),
@@ -253,14 +265,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         label: 'Agregar al carrito',
                         variant: AppButtonVariant.secondary,
                         icon: Icons.add_shopping_cart,
-                        onPressed: () {
-                          AppToast.show(
-                            context,
-                            message: 'Agregado al carrito',
-                            type: ToastType.success,
-                          );
-                          context.go('/cart');
-                        },
+                        loading: _actionBusy,
+                        onPressed: _addToCart,
                       ),
                     ),
                   ],
@@ -291,141 +297,117 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     );
   }
 
-  Future<void> _showReserveSheet() async {
-    final product = _product;
-    if (product == null || product.variants.isEmpty) return;
-    final variant = product.variants.firstWhere(
-      (v) =>
-          v.size.name ==
-              (_selectedSize ?? product.variants.first.size.name) &&
-          v.color.name ==
-              (_selectedColor ?? product.variants.first.color.name),
-      orElse: () => product.variants.first,
-    );
+  ProductVariant _selectedVariant() {
+    final variants = _product!.variants.where((v) =>
+      v.size.name == _selectedSize && v.color.name == _selectedColor);
+    if (variants.isEmpty) {
+      throw ApiException('Elige una combinación de talla y color válida.');
+    }
+    return variants.first;
+  }
 
-    final branchFuture = ref.read(apiClientProvider).get('/locations/branches');
-    final branchesData = await branchFuture;
-    final branches = (branchesData['items'] as List? ?? branchesData as List?)
-            ?.map((e) => {
-                  'id': e['id'] as int,
-                  'name': e['name'] as String? ?? 'Sucursal',
-                })
-            .toList() ??
-        const [];
+  Future<void> _performAction(Future<void> Function() action) async {
+    if (_actionBusy) {
+      return;
+    }
+    setState(() {
+      _actionBusy = true;
+      _actionError = null;
+    });
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _actionError = e is ApiException ? e.message :
+          'No se pudo completar la operación. Consulta su estado antes de repetir.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _actionBusy = false);
+      }
+    }
+  }
 
-    if (!mounted || branches.isEmpty) return;
+  Future<void> _addToCart() => _performAction(() async {
+    _consultPath = '/cart';
+    final variant = _selectedVariant();
+    final product = _product!;
+    await ref.read(cartControllerProvider.notifier).addItem(CartItem(
+      variantId: variant.id, productId: product.id, name: product.name,
+      price: variant.price ?? product.price, quantity: _quantity,
+      size: variant.size.name, color: variant.color.name,
+    ));
+    if (!mounted) {
+      return;
+    }
+    AppToast.show(context, message: 'Agregado al carrito', type: ToastType.success);
+    context.go('/cart');
+  });
 
-    int selectedBranchId = branches.first['id'] as int;
-    int reserveQuantity = 1;
-
-    await showModalBottomSheet<void>(
+  Future<void> _showReserveSheet() => _performAction(() async {
+    _consultPath = '/reservations';
+    final variant = _selectedVariant();
+    final branches = (await ref.read(apiClientProvider)
+      .getList('/locations/branches'))
+      .map((e) => Branch.fromJson(e as Map<String, dynamic>)).toList();
+    if (!mounted) {
+      return;
+    }
+    if (branches.isEmpty) {
+      throw ApiException('No hay sucursales disponibles para reservar.');
+    }
+    int? branchId;
+    int quantity = _quantity;
+    bool submitted = false;
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-            ),
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
             padding: const EdgeInsets.all(AppSpacing.x5),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Reservar en tienda',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.x3),
-                Text(
-                  '${product.name} — ${variant.size.name} / ${variant.color.name}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: AppSpacing.x4),
-                Text('Sucursal', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: AppSpacing.x2),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      isExpanded: true,
-                      value: selectedBranchId,
-                      items: branches
-                          .map((b) => DropdownMenuItem<int>(
-                                value: b['id'] as int,
-                                child: Text(b['name'] as String),
-                              ))
-                          .toList(),
-                      onChanged: (v) =>
-                          setSheetState(() => selectedBranchId = v ?? selectedBranchId),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.x4),
-                _QuantityStepper(
-                  quantity: reserveQuantity,
-                  onChanged: (v) => setSheetState(() => reserveQuantity = v),
-                ),
-                const SizedBox(height: AppSpacing.x5),
-                SizedBox(
-                  width: double.infinity,
-                  child: AppButton(
-                    label: 'Confirmar reserva',
-                    icon: Icons.check_circle_outline,
-                    onPressed: () async {
-                      // Capture everything context-dependent before the async
-                      // gap: this BuildContext belongs to build(), not the State.
-                      final router = GoRouter.of(context);
-                      final overlay = Overlay.of(context);
-                      Navigator.pop(context);
-                      try {
-                        await ref
-                            .read(reservationControllerProvider.notifier)
-                            .create(
-                              items: [
-                                {'variant_id': variant.id, 'quantity': reserveQuantity}
-                              ],
-                              branchId: selectedBranchId,
-                            );
-                        if (!mounted) return;
-                        AppToast.showVia(overlay,
-                            message: 'Reserva creada', type: ToastType.success);
-                        router.go('/reservations');
-                      } catch (e) {
-                        if (!mounted) return;
-                        AppToast.showVia(overlay,
-                            message: 'Error: $e', type: ToastType.error);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.x3),
-              ],
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('Reservar en tienda', style: Theme.of(context).textTheme.titleLarge),
+              Text('${_product!.name} — ${variant.size.name} / ${variant.color.name}'),
+              DropdownButton<int>(
+                isExpanded: true,
+                hint: const Text('Elige una sucursal'),
+                value: branchId,
+                items: branches.map((b) => DropdownMenuItem(
+                  value: b.id, child: Text(b.name))).toList(),
+                onChanged: (v) => setSheetState(() => branchId = v),
+              ),
+              _QuantityStepper(quantity: quantity,
+                onChanged: (v) => setSheetState(() => quantity = v)),
+              AppButton(label: 'Confirmar reserva',
+                onPressed: branchId == null ? null : () {
+                  if (submitted) {
+                    return;
+                  }
+                  submitted = true;
+                  Navigator.pop(context, true);
+                }),
+              TextButton(onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar')),
+            ]),
           ),
         ),
       ),
     );
-  }
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    await ref.read(reservationControllerProvider.notifier).create(
+      items: [{'variant_id': variant.id, 'quantity': quantity}],
+      branchId: branchId!,
+    );
+    if (!mounted) {
+      return;
+    }
+    AppToast.show(context, message: 'Reserva creada', type: ToastType.success);
+    context.go('/reservations');
+  });
+
 }
 
 class _Gallery extends StatefulWidget {

@@ -1,24 +1,35 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../config/app_config.dart';
 import '../models/models.dart';
 
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode, this.data});
+  ApiException(this.message, {this.statusCode, this.data,
+    this.mayHaveReachedServer = true});
 
   final String message;
   final int? statusCode;
   final dynamic data;
+  final bool mayHaveReachedServer;
 
   @override
   String toString() => message;
 }
 
 class ApiClient {
-  ApiClient(this.config);
+  ApiClient(this.config, {this.tokenReader, this.diagnostics,
+    this.requestTimeout = const Duration(seconds: 45)});
 
   final AppConfig config;
+  final Future<String?> Function()? tokenReader;
+  final void Function(String)? diagnostics;
+  final Duration requestTimeout;
+  final Set<String> _creating = {};
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
@@ -43,11 +54,28 @@ class ApiClient {
     base.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.read(key: _tokenKey);
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
+          try {
+            final token = await getToken().timeout(requestTimeout);
+            if (options.cancelToken?.isCancelled ?? false) {
+              handler.reject(DioException(requestOptions: options,
+                type: DioExceptionType.cancel));
+              return;
+            }
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+            final session = 'session=${token != null && token.isNotEmpty ? 'present' : 'absent'}';
+            if (diagnostics != null) {
+              diagnostics!(session);
+            } else {
+              debugPrint('FashionStore.http $session');
+            }
+            handler.next(options);
+          } catch (_) {
+            handler.reject(DioException(requestOptions: options,
+              error: ApiException('No se pudo leer la sesión. Inicia sesión nuevamente.',
+                mayHaveReachedServer: false)));
           }
-          handler.next(options);
         },
         onError: (error, handler) {
           handler.next(error);
@@ -59,19 +87,22 @@ class ApiClient {
 
   /// Parses the error body or returns a generic message.
   ApiException _parseError(DioException error) {
+    if (error.error is ApiException) {
+      return error.error as ApiException;
+    }
     final status = error.response?.statusCode;
     final data = error.response?.data;
-    String message = 'Error de conexión. Inténtalo de nuevo.';
+    String message = status == 401
+        ? 'Sesión no válida. Inicia sesión nuevamente.'
+        : 'No se pudo conectar con el servidor. Comprueba tu conexión.';
 
     if (data is Map<String, dynamic>) {
-      final detail = data['detail'];
+      final detail = data['detail'] ?? data['message'];
       message = detail is String
           ? _humanize(detail)
           : (detail is List && detail.isNotEmpty)
               ? _extractValidationMessage(detail)
               : message;
-    } else if (data is String && data.isNotEmpty) {
-      message = data;
     }
 
     return ApiException(message, statusCode: status, data: data);
@@ -97,57 +128,117 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> get(String path,
-      {Map<String, dynamic>? queryParameters}) async {
-    try {
-      final res = await dio.get(path, queryParameters: queryParameters);
-      return res.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw _parseError(e);
-    }
-  }
+      {Map<String, dynamic>? queryParameters}) =>
+      _request('GET', path, queryParameters: queryParameters);
 
   /// GET that returns a top-level JSON list.
   Future<List<dynamic>> getList(String path,
-      {Map<String, dynamic>? queryParameters}) async {
-    try {
-      final res = await dio.get(path, queryParameters: queryParameters);
-      return res.data as List<dynamic>;
-    } on DioException catch (e) {
-      throw _parseError(e);
-    }
-  }
+      {Map<String, dynamic>? queryParameters}) =>
+      _request('GET', path, queryParameters: queryParameters);
 
   Future<Map<String, dynamic>> post(String path,
-      {Object? data, Map<String, dynamic>? queryParameters}) async {
-    try {
-      final res =
-          await dio.post(path, data: data, queryParameters: queryParameters);
-      return res.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw _parseError(e);
-    }
-  }
+      {Object? data, Map<String, dynamic>? queryParameters}) =>
+      _request('POST', path, data: data, queryParameters: queryParameters);
 
   Future<Map<String, dynamic>> patch(String path,
-      {Object? data}) async {
+      {Object? data}) => _request('PATCH', path, data: data);
+
+  Future<Map<String, dynamic>> delete(String path,
+      {Object? data}) => _request('DELETE', path, data: data);
+
+  Future<T> _request<T>(String method, String path,
+      {Object? data, Map<String, dynamic>? queryParameters}) async {
+    final cancel = CancelToken();
+    int? status;
+    // No bodies, query values, identifiers, credentials or exception contents.
+    final base = Uri.parse(config.apiBaseUrl);
+    const publicSegments = {'', 'api', 'v1', 'cart', 'items', 'purchase',
+      'checkout', 'reservations', 'me', 'status', 'locations', 'branches',
+      'cities', 'catalog', 'categories', 'availability', 'auth', 'login',
+      'register', 'users', 'payments', 'config', 'confirm', 'sales',
+      'receipt', 'history'};
+    final route = Uri.parse(path).path.split('/').map((part) =>
+      publicSegments.contains(part) ? part : ':id').join('/');
+    final label = '$method ${base.scheme}://${base.host}${base.hasPort ? ':${base.port}' : ''}${base.path}$route';
+    void log(String result) {
+      final message = '$label HTTP=${status ?? '-'} $result';
+      if (diagnostics != null) {
+        diagnostics!(message);
+      } else {
+        debugPrint('FashionStore.http $message');
+      }
+    }
+    log('start');
     try {
-      final res = await dio.patch(path, data: data);
-      return res.data as Map<String, dynamic>;
+      final res = await dio.request<dynamic>(path,
+        options: Options(method: method), data: data,
+        queryParameters: queryParameters, cancelToken: cancel,
+      ).timeout(requestTimeout, onTimeout: () {
+        cancel.cancel();
+        throw TimeoutException('request deadline');
+      });
+      status = res.statusCode;
+      final body = res.statusCode == 204 ? <String, dynamic>{} : res.data;
+      if (body is! T) {
+        log('invalid_response');
+        throw ApiException('La API devolvió un formato inesperado.', statusCode: status);
+      }
+      log('ok');
+      return body;
     } on DioException catch (e) {
+      status = e.response?.statusCode;
+      log(e.error is ApiException ? 'session_read_failed' : e.type.name);
       throw _parseError(e);
+    } on TimeoutException {
+      log('timeout');
+      throw ApiException('La solicitud agotó el tiempo de espera. Comprueba tu conexión.');
     }
   }
 
-  Future<Map<String, dynamic>> delete(String path,
-      {Object? data}) async {
+  /// These endpoints increment/create and have no server idempotency key.
+  /// Persist uncertainty per account before sending; a GET is not proof that
+  /// a timed-out transaction will never commit, so it must not unlock a retry.
+  Future<T> createOnce<T>(String path, {required Object data,
+      required T Function(Map<String, dynamic>) decode}) async {
+    if (!_creating.add(path)) {
+      throw ApiException('Hay una solicitud en curso. Espera su resultado.');
+    }
     try {
-      final res = await dio.delete(path, data: data);
-      return res.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 204 || e.response?.data == null) {
-        return const {};
+      final token = await getToken().timeout(requestTimeout);
+      if (token == null) {
+        throw ApiException('Inicia sesión para continuar.');
       }
-      throw _parseError(e);
+      final claims = jsonDecode(utf8.decode(base64Url.decode(
+        base64Url.normalize(token.split('.')[1])))) as Map<String, dynamic>;
+      final subject = claims['sub'];
+      if (subject == null) {
+        throw ApiException('Inicia sesión nuevamente.');
+      }
+      final key = 'pending_creation_${base64Url.encode(utf8.encode('${config.apiBaseUrl}|$subject|$path'))}';
+      final pending = await _storage.read(key: key).timeout(requestTimeout);
+      const uncertain = 'Resultado sin confirmar. Consulta Carrito o Mis reservas y solicita verificar el intento antes de repetirlo. No se reenviará automáticamente.';
+      if (pending != null) {
+        throw ApiException(uncertain);
+      }
+      await _storage.write(key: key, value: 'pending').timeout(requestTimeout);
+      try {
+        final result = decode(await post(path, data: data));
+        await _storage.delete(key: key).timeout(requestTimeout);
+        return result;
+      } catch (error) {
+        if (error is ApiException && (!error.mayHaveReachedServer ||
+            const [400, 401, 403, 404, 409, 422].contains(error.statusCode))) {
+          await _storage.delete(key: key).timeout(requestTimeout);
+          rethrow;
+        }
+        throw ApiException(uncertain);
+      }
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('No se pudo verificar la sesión o guardar el intento. Consulta tus operaciones antes de repetir.');
+    } finally {
+      _creating.remove(path);
     }
   }
 
@@ -172,7 +263,7 @@ class ApiClient {
     await _storage.delete(key: 'auth_refresh_token');
   }
 
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
+  Future<String?> getToken() => tokenReader?.call() ?? _storage.read(key: _tokenKey);
   Future<bool> hasSession() async {
     final token = await _storage.read(key: _tokenKey);
     return token != null && token.isNotEmpty;

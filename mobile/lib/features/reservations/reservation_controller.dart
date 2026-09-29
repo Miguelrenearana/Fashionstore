@@ -37,26 +37,29 @@ class ReservationController extends StateNotifier<ReservationState> {
   }
 
   final ApiClient _api;
+  bool _creating = false;
+  int _loadVersion = 0;
 
   Future<void> load() async {
+    final version = ++_loadVersion;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final dynamic res = await _api.get('/reservations/me');
-      // Backend returns list directly, not wrapped in {items: [...]}
-      final List<dynamic> data;
-      if (res is List) {
-        data = List<dynamic>.from(res);
-      } else if (res is Map && res['items'] is List) {
-        data = List<dynamic>.from(res['items'] as List);
-      } else {
-        data = const [];
-      }
+      final data = await _api.getList('/reservations/me');
       final reservations = data
           .map((e) => Reservation.fromJson(e as Map<String, dynamic>))
           .toList();
-      state = state.copyWith(reservations: reservations, isLoading: false);
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+      if (mounted && version == _loadVersion) {
+        state = state.copyWith(reservations: reservations);
+      }
+    } catch (e) {
+      if (mounted && version == _loadVersion) {
+        state = state.copyWith(error: e is ApiException ? e.message :
+          'No se pudo interpretar la respuesta de reservas.');
+      }
+    } finally {
+      if (mounted && version == _loadVersion) {
+        state = state.copyWith(isLoading: false, error: state.error);
+      }
     }
   }
 
@@ -65,12 +68,28 @@ class ReservationController extends StateNotifier<ReservationState> {
     required int branchId,
     String? notes,
   }) async {
-    await _api.post('/reservations', data: {
-      'branch_id': branchId,
-      'items': items,
-      if (notes != null && notes.isNotEmpty) 'notes': notes,
-    });
-    await load();
+    if (_creating) {
+      throw ApiException('La reserva está en curso.');
+    }
+    _creating = true;
+    ++_loadVersion;
+    try {
+      final reservation = await _api.createOnce('/reservations', data: {
+        'branch_id': branchId,
+        'items': items,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      }, decode: Reservation.fromJson);
+      ++_loadVersion;
+      if (mounted) {
+        state = state.copyWith(isLoading: false, reservations: [reservation,
+          ...state.reservations.where((r) => r.id != reservation.id)]);
+      }
+    } catch (_) {
+      await load(); // Consultar; nunca repetir el POST tras respuesta perdida.
+      rethrow;
+    } finally {
+      _creating = false;
+    }
   }
 
   /// Cancela la reserva. El backend exige el estado en mayusculas.

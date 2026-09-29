@@ -28,7 +28,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         foregroundColor: Colors.white,
         title: Text('Carrito (${state.itemCount})'),
       ),
-      body: state.items.isEmpty
+      body: state.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : state.error != null
+          ? AppEmptyState(
+              title: 'No se pudo actualizar el carrito',
+              message: state.error,
+              icon: Icons.error_outline,
+              actionLabel: 'Consultar de nuevo',
+              onAction: notifier.load,
+            )
+          : state.items.isEmpty
           ? const AppEmptyState(
               title: 'Tu carrito está vacío',
               message: 'Explora el catálogo y encuentra tu próximo outfit.',
@@ -102,7 +112,10 @@ class _CartItemTile extends StatelessWidget {
     return Dismissible(
       key: ValueKey(item.variantId),
       direction: DismissDirection.endToStart,
-      onDismissed: (_) => onRemove(),
+      confirmDismiss: (_) async {
+        onRemove();
+        return false; // El servidor confirma la eliminación antes de quitar la fila.
+      },
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: AppSpacing.x4),

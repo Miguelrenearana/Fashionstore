@@ -46,41 +46,86 @@ class CartController extends StateNotifier<CartState> {
   }
 
   final ApiClient _api;
+  bool _mutating = false;
+  int _loadVersion = 0;
+
+  CartState _decode(Map<String, dynamic> res) => CartState(
+    items: (res['details'] as List)
+      .map((e) => CartItem.fromJson(e as Map<String, dynamic>)).toList(),
+    serverTotal: (res['total'] as num).toDouble(),
+  );
 
   Future<void> load() async {
+    final version = ++_loadVersion;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final res = await _api.get('/cart');
-      // El backend llama `details` a las lineas, no `items`.
-      final items = (res['details'] as List? ?? const [])
-          .map((e) => CartItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-      state = state.copyWith(
-        items: items,
-        serverTotal: (res['total'] as num?)?.toDouble() ?? 0,
-        isLoading: false,
-      );
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+      final decoded = _decode(res);
+      if (mounted && version == _loadVersion) {
+        state = decoded;
+      }
+    } catch (e) {
+      if (mounted && version == _loadVersion) {
+        state = state.copyWith(error: e is ApiException ? e.message :
+          'No se pudo interpretar la respuesta del carrito.');
+      }
+    } finally {
+      if (mounted && version == _loadVersion) {
+        state = state.copyWith(isLoading: false, error: state.error);
+      }
     }
   }
 
   Future<void> addItem(CartItem item) async {
-    await _api.post('/cart/items', data: {
-      'variant_id': item.variantId,
-      'quantity': item.quantity,
-    });
-    await load();
+    await _mutate(() => _api.createOnce('/cart/items', data: {
+        'variant_id': item.variantId,
+        'quantity': item.quantity,
+      }, decode: _decode), rethrowError: true);
+  }
+
+  Future<void> _mutate(Future<CartState> Function() action,
+      {bool rethrowError = false}) async {
+    if (_mutating) {
+      if (rethrowError) {
+        throw ApiException('Hay una actualización del carrito en curso.');
+      }
+      return;
+    }
+    _mutating = true;
+    ++_loadVersion;
+    state = state.copyWith(isLoading: true);
+    try {
+      final result = await action();
+      ++_loadVersion;
+      if (mounted) {
+        state = result;
+      }
+    } catch (e) {
+      await load(); // Recuperar el estado del servidor sin repetir la escritura.
+      if (mounted) {
+        state = state.copyWith(error: e is ApiException ? e.message :
+          'No se pudo actualizar el carrito. Consulta su estado antes de repetir.');
+      }
+      if (rethrowError) {
+        rethrow;
+      }
+    } finally {
+      _mutating = false;
+      if (mounted) {
+        state = state.copyWith(isLoading: false, error: state.error);
+      }
+    }
   }
 
   Future<void> updateQuantity(int variantId, int quantity) async {
-    await _api.patch('/cart/items/$variantId', data: {'quantity': quantity});
-    await load();
+    await _mutate(() async => _decode(await _api.patch('/cart/items/$variantId', data: {
+      'variant_id': variantId, 'quantity': quantity,
+    })));
   }
 
   Future<void> removeItem(int variantId) async {
-    await _api.delete('/cart/items/$variantId');
-    await load();
+    await _mutate(() async =>
+      _decode(await _api.delete('/cart/items/$variantId')));
   }
 
   Future<void> clear() async {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/design/design.dart';
+import '../../core/network/api_client.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'reservation_controller.dart';
 import 'reservation_models.dart';
@@ -80,6 +81,15 @@ class _ReservationsScreenState extends ConsumerState<ReservationsScreen>
     if (state.isLoading && filtered.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
+    if (state.error != null) {
+      return AppEmptyState(
+        title: 'No se pudieron cargar las reservas',
+        message: state.error,
+        icon: Icons.error_outline,
+        actionLabel: 'Reintentar',
+        onAction: () => ref.read(reservationControllerProvider.notifier).load(),
+      );
+    }
     if (filtered.isEmpty) {
       return const AppEmptyState(
         title: 'No hay reservas aquí',
@@ -117,12 +127,18 @@ class _ReservationsScreenState extends ConsumerState<ReservationsScreen>
               ),
             );
             if (confirmed == true) {
-              await ref
-                  .read(reservationControllerProvider.notifier)
-                  .cancel(reservation.id);
-              if (context.mounted) {
-                AppToast.show(context,
-                    message: 'Reserva cancelada', type: ToastType.success);
+              try {
+                await ref.read(reservationControllerProvider.notifier)
+                    .cancel(reservation.id);
+                if (context.mounted) {
+                  AppToast.show(context,
+                      message: 'Reserva cancelada', type: ToastType.success);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  AppToast.show(context, type: ToastType.error,
+                    message: e is ApiException ? e.message : 'No se pudo cancelar la reserva.');
+                }
               }
             }
           },

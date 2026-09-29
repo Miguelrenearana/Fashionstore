@@ -335,11 +335,19 @@ void main() {
       if (reserve) {
         // The product loading indicators keep animating while the sheet is open.
         await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
         expect(adapter.requests.where((o) => o.method == 'POST'), isEmpty);
-        await tester.tap(find.byType(DropdownButton<int>));
-        await tester.pump(const Duration(seconds: 1));
-        await tester.tap(find.text('Centro').last);
-        await tester.pump(const Duration(seconds: 1));
+        final branchSelector = find.byType(DropdownButton<int>);
+        await tester.ensureVisible(branchSelector);
+        await tester.pump();
+        await tester.tap(branchSelector);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        final branchOption = find.text('Centro').last;
+        expect(branchOption, findsOneWidget);
+        await tester.tap(branchOption);
+        await tester.pump(const Duration(milliseconds: 300));
         await tester.tap(find.text('Confirmar reserva'));
       }
       await tester.pump(const Duration(seconds: 1));

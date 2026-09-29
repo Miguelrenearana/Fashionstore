@@ -15,7 +15,7 @@ services:
       - key: PAYMENT_GATEWAY
         value: mock
       - key: CORS_ORIGINS
-        value: https://fashionstore.vercel.app
+        value: https://fashionstore-sonclar.vercel.app
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
@@ -139,7 +140,13 @@ export class RegisterComponent {
         this.router.navigate([this.auth.homeRoute()]);
       },
       error: (e) => {
-        this.error = typeof e === 'string' ? e : 'No se pudo crear la cuenta.';
+        if (e instanceof HttpErrorResponse && e.status === 0) {
+          this.error = 'No se pudo conectar con el servidor. Comprueba la conexión y, si ya intentaste registrarte, prueba iniciar sesión antes de repetir.';
+        } else if (e instanceof HttpErrorResponse && e.status === 403) {
+          this.error = 'Este correo ya está registrado. Inicia sesión o recupera tu contraseña.';
+        } else {
+          this.error = 'No se pudo crear la cuenta. Revisa los datos e intenta nuevamente.';
+        }
         this.loading = false;
       },
     });
